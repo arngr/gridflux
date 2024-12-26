@@ -91,6 +91,8 @@ Make sure you have the following installed:
 ```bash
 git clone https://github.com/zyxidra/littlewin.git
 cd littlewin
+chmod +x install.sh
+./install.sh
 ```
 
 ### Build the Project ⚙️
@@ -132,7 +134,15 @@ For further development, you may also want to modify the configuration settings 
 
 ## Acknowledgements 🙏
 
-- Inspired by `wmctrl` and tiling window managers. 💡
+- Inspired by tiling window managers. 💡
 - Thanks to the X11 community for providing useful tools like `xprop` and `xwininfo`. 👏
+
+---
+
+## Alternative 
+
+- [bspwm](https://github.com/baskerville/bspwm)
+- [FancyWM](https://github.com/FancyWM/fancywm) (for Windows User)
+
 
 ---
