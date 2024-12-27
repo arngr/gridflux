@@ -41,8 +41,10 @@ Here are various layout arrangements for windows. The configurations showcase ho
 |           |           |
 +-----------------------+
 ```
+```
+```
 
-#### Vertical Split
+### Three Window Layout
 ```
 +-----------------------+
 |           |           |
@@ -52,22 +54,6 @@ Here are various layout arrangements for windows. The configurations showcase ho
 |     ^     |           |
 |           |     3     |
 |           |     ^     |
-+-----------------------+
-```
-
----
-
-### Three Window Layout
-#### Centered Split
-```
-+-----------------------+
-|           |           |
-|     1     |     2     |
-|     ^     |           |
-|-----------|-----------|
-|           |           |
-|     4     |     3     |
-|           |           |
 +-----------------------+
 ```
 

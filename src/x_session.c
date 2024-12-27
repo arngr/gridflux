@@ -17,7 +17,7 @@
  * Copyright (C) 2024 Ardi Nugraha
  */
 
-#include "X11_session.h"
+#include "x_session.h"
 #include "littlewin.h"
 #include <X11/Xlib.h>
 #include <stdarg.h>
@@ -25,7 +25,7 @@
 #include <stdlib.h>
 #include <time.h>
 
-const int WIN_APP_LIMIT = 5;
+const int WIN_APP_LIMIT = 4;
 
 static Display *initialize_display() {
   int try_index = 0;

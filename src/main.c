@@ -17,7 +17,7 @@
  * Copyright (C) 2024 Ardi Nugraha
  */
 
-#include "X11_session.h"
+#include "x_session.h"
 
 int main() {
 #ifdef __linux
