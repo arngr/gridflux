@@ -201,21 +201,39 @@ static void arrange_window(int window_count, Window windows[], Display *display,
       }
       break;
 
-    case 4:
-      // Four windows split into quadrants
-      width = half_width;
-      height = half_height;
-      x = (i % 2) * half_width;
-      y = (i / 2) * half_height;
-      break;
-
     default:
-      // For more than 4 windows, stack them vertically on the left side
-      x = 0;
-      y = 0;
-      width = screen_width;
-      height = screen_height - 10;
-      break;
+      if (i == 0) {
+        // First window takes either left or right half
+        x = 0;
+        y = 0;
+        width = half_width;
+        height = screen_height;
+      } else {
+        // Check if first window is on the left or right, then arrange others
+        // accordingly
+        if (window_count > 3) {
+          if (i % 2 == 1) {
+            // If first window is left, arrange windows on the right
+            // (upper-right, bottom-right)
+            x = half_width;
+            y = 0;
+            width = half_width;
+            height = half_height;
+          } else if (i % 2 == 0) {
+            // Continue placing windows in the right half (bottom-right)
+            x = half_width;
+            y = half_height;
+            width = half_width;
+            height = half_height;
+          } else {
+            // Additional windows will stack vertically in the same half
+            x = half_width;
+            y = (i - 2) * half_height;
+            width = half_width;
+            height = half_height;
+          }
+        }
+      }
     }
 
     XMoveResizeWindow(display, windows[i], x, y, width, height);
