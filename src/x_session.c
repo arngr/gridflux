@@ -25,7 +25,7 @@
 #include <stdlib.h>
 #include <time.h>
 
-const int WIN_APP_LIMIT = 4;
+const int WIN_APP_LIMIT = 7;
 
 static Display *initialize_display() {
   int try_index = 0;
@@ -174,7 +174,7 @@ static void arrange_window(int window_count, Window windows[], Display *display,
       x = 0;
       y = 0;
       width = screen_width;
-      height = screen_height - 10;
+      height = screen_height - 5;
       break;
 
     case 2:
@@ -201,39 +201,45 @@ static void arrange_window(int window_count, Window windows[], Display *display,
       }
       break;
 
-    default:
+    case 4:
+      // Four windows split into quadrants
+      width = half_width;
+      height = half_height;
+      x = (i % 2) * half_width;
+      y = (i / 2) * half_height;
+      break;
+
+    case 5:
       if (i == 0) {
-        // First window takes either left or right half
+        // First window occupies left half
         x = 0;
         y = 0;
         width = half_width;
         height = screen_height;
       } else {
-        // Check if first window is on the left or right, then arrange others
-        // accordingly
-        if (window_count > 3) {
-          if (i % 2 == 1) {
-            // If first window is left, arrange windows on the right
-            // (upper-right, bottom-right)
-            x = half_width;
-            y = 0;
-            width = half_width;
-            height = half_height;
-          } else if (i % 2 == 0) {
-            // Continue placing windows in the right half (bottom-right)
-            x = half_width;
-            y = half_height;
-            width = half_width;
-            height = half_height;
-          } else {
-            // Additional windows will stack vertically in the same half
-            x = half_width;
-            y = (i - 2) * half_height;
-            width = half_width;
-            height = half_height;
-          }
-        }
+        // Remaining windows split into quadrants on the right
+        x = half_width + ((i - 1) % 2) * (half_width);
+        y = ((i - 1) / 2) * (half_height);
+        width = half_width / 2;
+        height = half_height;
       }
+      break;
+
+    case 6:
+      if (i < 2) {
+        // Two windows split vertically on the left
+        x = 0;
+        y = i * half_height;
+        width = half_width;
+        height = half_height;
+      } else {
+        // Remaining four windows split into quadrants on the right
+        x = half_width + ((i - 2) % 2) * (half_width);
+        y = ((i - 2) / 2) * (half_height);
+        width = half_width / 2;
+        height = half_height;
+      }
+      break;
     }
 
     XMoveResizeWindow(display, windows[i], x, y, width, height);
