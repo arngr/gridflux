@@ -20,6 +20,7 @@
 #include "x_session.h"
 #include "littlewin.h"
 #include <X11/Xlib.h>
+#include <math.h>
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -400,6 +401,22 @@ static unsigned long get_total_workspace(Display *display, Window root) {
   return total_workspaces;
 }
 
+static int get_total_window(Display *display, Window root) {
+  unsigned long total_win = 0;
+  int total_workspaces = get_total_workspace(display, root);
+
+  Atom window_list_atom = XInternAtom(display, "_NET_CLIENT_LIST", True);
+
+  for (int i = 0; i <= total_workspaces; i++) {
+    unsigned long current_window_count = 0;
+    fetch_window_list(display, root, &current_window_count, window_list_atom,
+                      i);
+    total_win += current_window_count;
+  }
+
+  return total_win;
+}
+
 static void arrange_dimension(Display *display, Window root,
                               unsigned long base_win_items,
                               Window *curr_win_open, win_info *base_win_info,
@@ -450,44 +467,15 @@ static void distribute_overflow_windows(
   }
 }
 
-static void create_new_workspace(Display *display, Window root) {
-  Atom number_of_desktops_atom =
-      XInternAtom(display, "_NET_NUMBER_OF_DESKTOPS", False);
-  Atom current_desktop_atom =
-      XInternAtom(display, "_NET_CURRENT_DESKTOP", False);
+static void create_new_workspace(Display *display, Window root,
+                                 unsigned long new_workspace) {
+  Atom net_current_desktop = XInternAtom(display, "_NET_CURRENT_DESKTOP", True);
 
-  if (number_of_desktops_atom == None || current_desktop_atom == None) {
-    fprintf(stderr, "Error: _NET_NUMBER_OF_DESKTOPS or _NET_CURRENT_DESKTOP "
-                    "not supported by the window manager.\n");
-    return;
-  }
-
-  // Get the current number of workspaces
-  Atom actual_type;
-  int actual_format;
-  unsigned long nitems, bytes_after;
-  unsigned char *data = NULL;
-
-  if (XGetWindowProperty(display, root, number_of_desktops_atom, 0, 1, False,
-                         XA_CARDINAL, &actual_type, &actual_format, &nitems,
-                         &bytes_after, &data) != Success ||
-      data == NULL) {
-    fprintf(stderr, "Error: Failed to retrieve number of desktops.\n");
-    return;
-  }
-
-  unsigned long num_desktops = *(unsigned long *)data;
-  XFree(data);
-
-  num_desktops++;
-  XChangeProperty(display, root, number_of_desktops_atom, XA_CARDINAL, 32,
-                  PropModeReplace, (unsigned char *)&num_desktops, 1);
-  XFlush(display);
-
-  unsigned long new_workspace = num_desktops - 1;
-  XChangeProperty(display, root, current_desktop_atom, XA_CARDINAL, 32,
+  // Set the new workspace
+  XChangeProperty(display, root, net_current_desktop, XA_CARDINAL, 32,
                   PropModeReplace, (unsigned char *)&new_workspace, 1);
-  XFlush(display);
+  XSync(display, False); // Ensure the action is committed
+  printf("Switched to workspace %lu\n", new_workspace);
 }
 
 static void handle_window_overflow(Display *display, Window root,
@@ -499,12 +487,6 @@ static void handle_window_overflow(Display *display, Window root,
 
   workspace_info free_workspace[total_workspace];
   int free_workspace_total = 0;
-
-  int current_workspace = get_current_workspace(display, root);
-
-  if (current_workspace >= total_workspace) {
-    create_new_workspace(display, root);
-  }
 
   for (int workspace = 0; workspace < total_workspace; workspace++) {
     Window *active_windows = fetch_window_list(
@@ -637,6 +619,16 @@ void run_x_layout() {
   XSetErrorHandler(error_handler);
 
   while (1) {
+    int total_workspaces = get_total_workspace(display, root) - 1;
+
+    unsigned long total_window = get_total_window(display, root);
+    int workspace_need = (int)total_window / WIN_APP_LIMIT;
+
+    printf("total workspace: %d \n", total_workspaces);
+    if (workspace_need > 0) {
+      create_new_workspace(display, root, workspace_need);
+    }
+
     manage_window(display, root, &base_win_items, base_win_info, screen);
     usleep(20000);
   }
