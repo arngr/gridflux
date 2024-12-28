@@ -95,8 +95,29 @@ activate_dynamic_workspaces() {
     echo "GNOME desktop detected. Activating dynamic workspaces..."
     gsettings set org.gnome.mutter dynamic-workspaces true
     echo "Dynamic workspaces activated."
+  elif [ "$XDG_CURRENT_DESKTOP" == "KDE" ]; then
+    echo "KDE desktop detected. Enabling dynamic virtual desktops..."
+
+    # Disable fixed desktop count and allow dynamic desktops
+    kwriteconfig5 --file kwinrc NumberOfDesktops 0 # 0 means dynamic desktop count
+    kwriteconfig5 --file kwinrc CurrentDesktop 1   # Start with desktop 1
+    qdbus org.kde.KWin /KWin reconfigure           # Apply changes
+
+    echo "Dynamic virtual desktops enabled in KDE."
   else
     echo "Dynamic workspaces configuration is not applicable for $XDG_CURRENT_DESKTOP."
+  fi
+}
+
+create_kde_virtual_desktops() {
+  if [ "$XDG_CURRENT_DESKTOP" == "KDE" ]; then
+    echo "KDE desktop detected. Setting up 4 virtual desktops..."
+    kwriteconfig5 --file kwinrc WorkspaceCount 4
+    kwriteconfig5 --file kwinrc CurrentDesktop 1
+    qdbus org.kde.KWin /KWin reconfigure
+    echo "4 virtual desktops created for KDE."
+  else
+    echo "Virtual desktops configuration is not applicable for $XDG_CURRENT_DESKTOP."
   fi
 }
 
@@ -106,5 +127,6 @@ install_dependencies
 build_and_install
 create_systemd_service
 activate_dynamic_workspaces
+create_kde_virtual_desktops
 
 echo "Installation complete! littlewin is set to run at login."
