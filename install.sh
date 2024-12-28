@@ -114,7 +114,7 @@ create_kde_virtual_desktops() {
     echo "KDE desktop detected. Creating 5 virtual desktops with incrementing numbers..."
  
     # Loop to create 5 desktops with incrementing numbers
-    for i in {1..5}; do
+    for i in {1..4}; do
       # Execute the qdbus command with the current incremented desktop number
       qdbus org.kde.KWin /VirtualDesktopManager createDesktop $i LittleWin
       echo "Created virtual desktop $i"
