@@ -1,3 +1,5 @@
+#!/bin/bash
+
 # Detect user and computer name
 USER_NAME=$(whoami)
 COMPUTER_NAME=$(hostname)
@@ -5,24 +7,47 @@ COMPUTER_NAME=$(hostname)
 INSTALL_DIR="/usr/local/bin"
 SERVICE_FILE="/etc/systemd/system/littlewin.service"
 
-# Function to check and install dependencies
 install_dependencies() {
-  echo "Updating package lists..."
+  echo "Detecting distribution and installing dependencies..."
 
-  # List of dependencies
   local dependencies="libx11-dev cmake gcc make"
 
-  for dep in $dependencies; do
-    if dpkg-query -l "$dep" &>/dev/null; then
-      echo "$dep is already installed."
-    else
-      echo "Installing $dep..."
-      sudo apt install -y "$dep"
-    fi
-  done
+  if [ -f /etc/os-release ]; then
+    . /etc/os-release
+    case "$ID" in
+    ubuntu | debian)
+      echo "Detected Debian-based distribution."
+      sudo apt update
+      for dep in $dependencies; do
+        if dpkg-query -l "$dep" &>/dev/null; then
+          echo "$dep is already installed."
+        else
+          echo "Installing $dep..."
+          sudo apt install -y "$dep"
+        fi
+      done
+      ;;
+    rhel | fedora | centos | almalinux | rocky)
+      echo "Detected RHEL-based distribution."
+      sudo dnf check-update || sudo yum check-update
+      sudo dnf install -y libX11-devel cmake gcc make || sudo yum install -y libX11-devel cmake gcc make
+      ;;
+    arch | manjaro)
+      echo "Detected Arch-based distribution."
+      sudo pacman -Syu --noconfirm
+      sudo pacman -S --noconfirm libx11 cmake gcc make
+      ;;
+    *)
+      echo "Unsupported distribution: $ID"
+      exit 1
+      ;;
+    esac
+  else
+    echo "Unable to detect distribution. Ensure dependencies are installed manually."
+    exit 1
+  fi
 }
 
-# Function to build and install the project
 build_and_install() {
   echo "Building the project..."
   cmake .
@@ -33,11 +58,9 @@ build_and_install() {
   sudo chmod +x "$INSTALL_DIR/littlewin"
 }
 
-# Function to create and enable the systemd service
 create_systemd_service() {
   echo "Creating systemd service for littlewin..."
 
-  # Check if service already exists and delete it
   if [ -f "$SERVICE_FILE" ]; then
     echo "Service already exists. Removing old service..."
     sudo systemctl stop littlewin.service
@@ -45,14 +68,13 @@ create_systemd_service() {
     sudo rm "$SERVICE_FILE"
   fi
 
-  # Create new service file
   sudo bash -c "cat > $SERVICE_FILE" <<EOL
 [Unit]
 Description=littlewin window manager
 After=graphical.target
 
 [Service]
-ExecStart=/usr/local/bin/littlewin
+ExecStart=$INSTALL_DIR/littlewin
 User=$USER_NAME
 Environment=DISPLAY=:1
 Environment=XDG_SESSION_TYPE=$XDG_SESSION_TYPE   # Pass the session type environment variable
@@ -63,13 +85,11 @@ RestartSec=3
 WantedBy=default.target
 EOL
 
-  # Reload systemd to apply changes
   sudo systemctl daemon-reload
   sudo systemctl enable littlewin.service
   sudo systemctl start littlewin.service
 }
 
-# Main installation process
 echo "Starting installation of littlewin..."
 
 install_dependencies

@@ -6,28 +6,32 @@ COMPUTER_NAME=$(hostname)
 INSTALL_DIR="/usr/local/bin"
 SERVICE_FILE="/etc/systemd/system/littlewin.service"
 
-# Function to remove the binary
 remove_binary() {
   echo "Removing littlewin binary from $INSTALL_DIR..."
-  sudo rm -f "$INSTALL_DIR/littlewin"
+  if [ -f "$INSTALL_DIR/littlewin" ]; then
+    sudo rm -f "$INSTALL_DIR/littlewin"
+    echo "Binary removed successfully."
+  else
+    echo "Binary not found at $INSTALL_DIR. Skipping."
+  fi
 }
 
-# Function to remove the systemd service
 remove_service() {
   echo "Removing systemd service for littlewin..."
 
-  # Stop and disable the service before removing it
-  sudo systemctl stop littlewin.service
-  sudo systemctl disable littlewin.service
+  if [ -f "$SERVICE_FILE" ]; then
+    sudo systemctl stop littlewin.service
+    sudo systemctl disable littlewin.service
+    sudo rm -f "$SERVICE_FILE"
 
-  # Remove the service file
-  sudo rm -f "$SERVICE_FILE"
-
-  # Reload systemd to apply the changes
-  sudo systemctl daemon-reload
+    # Reload systemd to apply the changes
+    sudo systemctl daemon-reload
+    echo "Systemd service removed successfully."
+  else
+    echo "Systemd service file not found. Skipping."
+  fi
 }
 
-# Main uninstallation process
 echo "Starting uninstallation of littlewin..."
 
 remove_binary

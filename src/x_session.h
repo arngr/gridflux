@@ -39,4 +39,4 @@ typedef struct workspace_information {
   int available_space;
 } workspace_info;
 
-void run_x11_layout();
+void run_x_layout();

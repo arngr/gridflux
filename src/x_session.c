@@ -165,6 +165,8 @@ static void arrange_window(int window_count, Window windows[], Display *display,
   int half_width = screen_width / 2;
   int half_height = screen_height / 2;
 
+  int third_width = screen_width / 3;
+
   for (int i = 0; i < window_count; i++) {
     int x = 0, y = 0, width = 0, height = 0;
 
@@ -214,13 +216,13 @@ static void arrange_window(int window_count, Window windows[], Display *display,
         // First window occupies left half
         x = 0;
         y = 0;
-        width = half_width;
+        width = screen_width / 3;
         height = screen_height;
       } else {
         // Remaining windows split into quadrants on the right
-        x = half_width + ((i - 1) % 2) * (half_width);
-        y = ((i - 1) / 2) * (half_height);
-        width = half_width / 2;
+        x = third_width + ((i - 1) % 2) * screen_width;
+        y = ((i - 1) / 2) * half_height;
+        width = screen_width / 3;
         height = half_height;
       }
       break;
@@ -230,13 +232,13 @@ static void arrange_window(int window_count, Window windows[], Display *display,
         // Two windows split vertically on the left
         x = 0;
         y = i * half_height;
-        width = half_width;
+        width = third_width;
         height = half_height;
       } else {
         // Remaining four windows split into quadrants on the right
-        x = half_width + ((i - 2) % 2) * (half_width);
+        x = third_width + ((i - 1) % 2) * screen_width;
         y = ((i - 2) / 2) * (half_height);
-        width = half_width / 2;
+        width = third_width;
         height = half_height;
       }
       break;
@@ -434,6 +436,7 @@ static void distribute_overflow_windows(
     for (int j = 0; j < free_workspace_total; j++) {
       for (int x = 0; x < free_workspace[j].available_space; x++) {
         if (current_window_count >= WIN_APP_LIMIT) {
+
           unmaximize_window(display, active_windows[current_window_count--]);
           move_window_to_workspace(display,
                                    active_windows[current_window_count--],
@@ -447,14 +450,61 @@ static void distribute_overflow_windows(
   }
 }
 
+static void create_new_workspace(Display *display, Window root) {
+  Atom number_of_desktops_atom =
+      XInternAtom(display, "_NET_NUMBER_OF_DESKTOPS", False);
+  Atom current_desktop_atom =
+      XInternAtom(display, "_NET_CURRENT_DESKTOP", False);
+
+  if (number_of_desktops_atom == None || current_desktop_atom == None) {
+    fprintf(stderr, "Error: _NET_NUMBER_OF_DESKTOPS or _NET_CURRENT_DESKTOP "
+                    "not supported by the window manager.\n");
+    return;
+  }
+
+  // Get the current number of workspaces
+  Atom actual_type;
+  int actual_format;
+  unsigned long nitems, bytes_after;
+  unsigned char *data = NULL;
+
+  if (XGetWindowProperty(display, root, number_of_desktops_atom, 0, 1, False,
+                         XA_CARDINAL, &actual_type, &actual_format, &nitems,
+                         &bytes_after, &data) != Success ||
+      data == NULL) {
+    fprintf(stderr, "Error: Failed to retrieve number of desktops.\n");
+    return;
+  }
+
+  unsigned long num_desktops = *(unsigned long *)data;
+  XFree(data);
+
+  num_desktops++;
+  XChangeProperty(display, root, number_of_desktops_atom, XA_CARDINAL, 32,
+                  PropModeReplace, (unsigned char *)&num_desktops, 1);
+  XFlush(display);
+
+  unsigned long new_workspace = num_desktops - 1;
+  XChangeProperty(display, root, current_desktop_atom, XA_CARDINAL, 32,
+                  PropModeReplace, (unsigned char *)&new_workspace, 1);
+  XFlush(display);
+}
+
 static void handle_window_overflow(Display *display, Window root,
                                    unsigned long *current_window_count,
                                    Atom window_list_atom, int total_workspace,
                                    int screen) {
   int overflow_workspace[total_workspace];
   int overflow_workspace_total = 0;
+
   workspace_info free_workspace[total_workspace];
   int free_workspace_total = 0;
+
+  int current_workspace = get_current_workspace(display, root);
+
+  if (current_workspace >= total_workspace) {
+    create_new_workspace(display, root);
+  }
 
   for (int workspace = 0; workspace < total_workspace; workspace++) {
     Window *active_windows = fetch_window_list(
@@ -549,7 +599,7 @@ static void manage_window(Display *display, Window root,
                               window_properties);
 }
 
-void run_x11_layout() {
+void run_x_layout() {
   Display *display = initialize_display();
   if (!display)
     return;

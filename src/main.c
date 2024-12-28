@@ -24,7 +24,7 @@ int main() {
   char *session_type = getenv("XDG_SESSION_TYPE");
   if (session_type != NULL) {
     if (strcmp(session_type, "x11") == 0) {
-      run_x11_layout();
+      run_x_layout();
     } else {
       printf("The session %s type is not supported.\n", session_type);
     }
