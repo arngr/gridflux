@@ -90,10 +90,21 @@ EOL
   sudo systemctl start littlewin.service
 }
 
+activate_dynamic_workspaces() {
+  if [ "$XDG_CURRENT_DESKTOP" == "GNOME" ]; then
+    echo "GNOME desktop detected. Activating dynamic workspaces..."
+    gsettings set org.gnome.mutter dynamic-workspaces true
+    echo "Dynamic workspaces activated."
+  else
+    echo "Dynamic workspaces configuration is not applicable for $XDG_CURRENT_DESKTOP."
+  fi
+}
+
 echo "Starting installation of littlewin..."
 
 install_dependencies
 build_and_install
 create_systemd_service
+activate_dynamic_workspaces
 
 echo "Installation complete! littlewin is set to run at login."

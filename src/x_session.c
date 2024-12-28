@@ -624,7 +624,6 @@ void run_x_layout() {
     unsigned long total_window = get_total_window(display, root);
     int workspace_need = (int)total_window / WIN_APP_LIMIT;
 
-    printf("total workspace: %d \n", total_workspaces);
     if (workspace_need > 0) {
       create_new_workspace(display, root, workspace_need);
     }
