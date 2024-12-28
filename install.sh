@@ -111,11 +111,19 @@ activate_dynamic_workspaces() {
 
 create_kde_virtual_desktops() {
   if [ "$XDG_CURRENT_DESKTOP" == "KDE" ]; then
-    echo "KDE desktop detected. Setting up 4 virtual desktops..."
-    kwriteconfig5 --file kwinrc WorkspaceCount 4
-    kwriteconfig5 --file kwinrc CurrentDesktop 1
+    echo "KDE desktop detected. Creating 5 virtual desktops with incrementing numbers..."
+ 
+    # Loop to create 5 desktops with incrementing numbers
+    for i in {1..5}; do
+      # Execute the qdbus command with the current incremented desktop number
+      qdbus org.kde.KWin /VirtualDesktopManager createDesktop $i LittleWin
+      echo "Created virtual desktop $i"
+    done
+ 
+    # Reload KWin configuration
     qdbus org.kde.KWin /KWin reconfigure
-    echo "4 virtual desktops created for KDE."
+ 
+    echo "5 virtual desktops created for KDE."
   else
     echo "Virtual desktops configuration is not applicable for $XDG_CURRENT_DESKTOP."
   fi
