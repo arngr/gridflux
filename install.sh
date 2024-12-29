@@ -109,32 +109,11 @@ activate_dynamic_workspaces() {
   fi
 }
 
-create_kde_virtual_desktops() {
-  if [ "$XDG_CURRENT_DESKTOP" == "KDE" ]; then
-    echo "KDE desktop detected. Creating 5 virtual desktops with incrementing numbers..."
- 
-    # Loop to create 5 desktops with incrementing numbers
-    for i in {1..4}; do
-      # Execute the qdbus command with the current incremented desktop number
-      qdbus org.kde.KWin /VirtualDesktopManager createDesktop $i LittleWin
-      echo "Created virtual desktop $i"
-    done
- 
-    # Reload KWin configuration
-    qdbus org.kde.KWin /KWin reconfigure
- 
-    echo "5 virtual desktops created for KDE."
-  else
-    echo "Virtual desktops configuration is not applicable for $XDG_CURRENT_DESKTOP."
-  fi
-}
-
 echo "Starting installation of littlewin..."
 
 install_dependencies
 build_and_install
 create_systemd_service
 activate_dynamic_workspaces
-create_kde_virtual_desktops
 
 echo "Installation complete! littlewin is set to run at login."
