@@ -591,11 +591,6 @@ static void create_new_workspace(Display *display, Window root,
  
 static void set_workspace(Display *display, Window root, unsigned long workspace) {
   const char *desktop_session = detect_desktop_environment();
-  if (strcmp(desktop_session, "GNOME") == 0) {
-      create_new_workspace(display, root, workspace);
-      return;
-  }
- 
   pid_t pid = fork(); // Create a new process
  
   if (pid == -1) {
@@ -609,8 +604,16 @@ static void set_workspace(Display *display, Window root, unsigned long workspace
                  "createDesktop", "1", "LittleWin", NULL) == -1) {
         perror("Error executing qdbus");
         _exit(EXIT_FAILURE);
+      } 
+    } else if (strcmp(desktop_session, "GNOME") == 0) {
+      if (execlp("gsettings", "gsettings", "set", "org.gnome.mutter",
+                 "dynamic-workspaces", "true", NULL) == -1) {
+        perror("Error executing gsettings");
+        _exit(EXIT_FAILURE);
       }
-    } else {
+           create_new_workspace(display, root, workspace);
+    }
+  } else {
       int status;
       waitpid(pid, &status, 0);
       if (WIFEXITED(status)) {
