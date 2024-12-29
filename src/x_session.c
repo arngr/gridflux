@@ -24,7 +24,11 @@
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
+#include <sys/types.h>
+#include <sys/wait.h>
 #include <time.h>
+#include <unistd.h>
 
 const int WIN_APP_LIMIT = 7;
 
@@ -467,17 +471,6 @@ static void distribute_overflow_windows(
   }
 }
 
-static void create_new_workspace(Display *display, Window root,
-                                 unsigned long new_workspace) {
-  Atom net_current_desktop = XInternAtom(display, "_NET_CURRENT_DESKTOP", True);
-
-  // Set the new workspace
-  XChangeProperty(display, root, net_current_desktop, XA_CARDINAL, 32,
-                  PropModeReplace, (unsigned char *)&new_workspace, 1);
-  XSync(display, False); // Ensure the action is committed
-  printf("Switched to workspace %lu\n", new_workspace);
-}
-
 static void handle_window_overflow(Display *display, Window root,
                                    unsigned long *current_window_count,
                                    Atom window_list_atom, int total_workspace,
@@ -564,6 +557,63 @@ static void rearrange_current_workspace(Display *display, Window root,
   }
 }
 
+const char *detect_desktop_environment() {
+  const char *xdg_current_desktop = getenv("XDG_CURRENT_DESKTOP");
+  const char *desktop_session = getenv("DESKTOP_SESSION");
+  const char *kde_full_session = getenv("KDE_FULL_SESSION");
+  const char *gnome_session_id = getenv("GNOME_DESKTOP_SESSION_ID");
+
+  if (kde_full_session && strcmp(kde_full_session, "true") == 0) {
+    return "KDE";
+  } else if (gnome_session_id ||
+             (xdg_current_desktop && strstr(xdg_current_desktop, "GNOME"))) {
+    return "GNOME";
+  } else if (xdg_current_desktop) {
+    return xdg_current_desktop; // Return the value of XDG_CURRENT_DESKTOP
+  } else if (desktop_session) {
+    return desktop_session; // Return the value of DESKTOP_SESSION
+  } else {
+    return "Unknown";
+  }
+}
+
+static void set_workspace() {
+  pid_t pid = fork(); // Create a new process
+
+  if (pid == -1) {
+    perror("Failed to fork");
+    return;
+  }
+
+  const char *desktop_session = detect_desktop_environment();
+  if (pid == 0) {
+
+    if (strcmp(desktop_session, "KDE") == 0) {
+      if (execlp("qdbus", "qdbus", "org.kde.KWin", "/VirtualDesktopManager",
+                 "createDesktop", "1", "LittleWin", NULL) == -1) {
+        perror("Error executing qdbus");
+        _exit(EXIT_FAILURE);
+      }
+    } else if (strcmp(desktop_session, "GNOME") == 0) {
+
+      if (execlp("gsettings", "gsettings", "set", "org.gnome.mutter",
+                 "dynamic-workspaces", "true", NULL) == -1) {
+        perror("Error executing gsettings");
+        _exit(EXIT_FAILURE);
+      }
+    } else {
+      int status;
+      waitpid(pid, &status, 0);
+      if (WIFEXITED(status)) {
+        LOG(LITTLEWIN_DBG, "command exited with status %d\n",
+            WEXITSTATUS(status));
+      } else {
+        LOG(LITTLEWIN_DBG, "command did not terminate normally\n");
+      }
+    }
+  }
+}
+
 static void manage_window(Display *display, Window root,
                           unsigned long *previous_window_count,
                           win_info *window_properties, int screen) {
@@ -624,8 +674,8 @@ void run_x_layout() {
     unsigned long total_window = get_total_window(display, root);
     int workspace_need = (int)total_window / WIN_APP_LIMIT;
 
-    if (workspace_need > 0) {
-      create_new_workspace(display, root, workspace_need);
+    if (workspace_need > 0 && total_workspaces <= workspace_need) {
+      set_workspace();
     }
 
     manage_window(display, root, &base_win_items, base_win_info, screen);
