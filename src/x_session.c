@@ -16,7 +16,7 @@
  *
  * Copyright (C) 2024 Ardi Nugraha
  */
-
+ 
 #include "x_session.h"
 #include "littlewin.h"
 #include <X11/Xlib.h>
@@ -29,9 +29,9 @@
 #include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
-
-const int WIN_APP_LIMIT = 5;
-
+ 
+const int WIN_APP_LIMIT = 4;
+ 
 static Display *initialize_display() {
   int try_index = 0;
   while (1) {
@@ -45,11 +45,11 @@ static Display *initialize_display() {
     }
   }
 }
-
+ 
 static Window get_root_window(Display *display) {
   return RootWindow(display, DefaultScreen(display));
 }
-
+ 
 static int error_handler(Display *display, XErrorEvent *error) {
   if (error->error_code == BadWindow) {
     LOG(LITTLEWIN_ERR,
@@ -61,7 +61,7 @@ static int error_handler(Display *display, XErrorEvent *error) {
   }
   return 0; // Return 0 to prevent the program from terminating
 }
-
+ 
 static int send_client_message(Display *display, Window window,
                                Atom message_type, Atom *atoms, int atom_count,
                                long *data) {
@@ -69,53 +69,54 @@ static int send_client_message(Display *display, Window window,
     LOG(LITTLEWIN_ERR, "Unable to retrieve required atom.\n");
     return -1;
   }
-
+ 
   XClientMessageEvent event = {0};
   event.type = ClientMessage;
   event.window = window;
   event.message_type = message_type;
   event.format = 32;
-
+ 
   for (int i = 0; i < atom_count; i++) {
     event.data.l[i] = data[i];
   }
-
+ 
   if (!XSendEvent(display, DefaultRootWindow(display), False,
                   SubstructureRedirectMask | SubstructureNotifyMask,
                   (XEvent *)&event)) {
     LOG(LITTLEWIN_ERR, "Failed to send event.\n");
     return -1;
   }
-
+ 
   XFlush(display);
   return 0;
 }
-
+ 
 static void unmaximize_window(Display *display, Window window) {
   Atom wm_state = XInternAtom(display, "_NET_WM_STATE", False);
   Atom max_horz = XInternAtom(display, "_NET_WM_STATE_MAXIMIZED_HORZ", False);
   Atom max_vert = XInternAtom(display, "_NET_WM_STATE_MAXIMIZED_VERT", False);
-
+ 
   if (wm_state == None || max_horz == None || max_vert == None) {
     LOG(LITTLEWIN_ERR, "Unable to retrieve required atoms.\n");
     return;
   }
-
+ 
   long data[] = {0, max_horz, max_vert}; // Unmaximize state data
   if (send_client_message(display, window, wm_state, NULL, 3, data) == 0) {
     LOG(LITTLEWIN_INFO, "Unmaximized window 0x%lx\n", window);
   }
 }
-
+ 
 static int move_window_to_workspace(Display *display, Window window,
                                     int workspace) {
+ 
   Atom net_wm_desktop = XInternAtom(display, "_NET_WM_DESKTOP", True);
   if (net_wm_desktop == None) {
     LOG(LITTLEWIN_ERR,
         "_NET_WM_DESKTOP atom is not supported by the X server.\n");
     return -1;
   }
-
+ 
   long data[] = {workspace, CurrentTime}; // Move to target workspace
   if (send_client_message(display, window, net_wm_desktop, NULL, 2, data) ==
       0) {
@@ -135,17 +136,17 @@ static void get_window_dimensions(Display *display, Window window, int *width,
     LOG(LITTLEWIN_ERR, "Display is NULL.\n");
     return;
   }
-
+ 
   if (window == None) {
     LOG(LITTLEWIN_ERR, "Invalid window.\n");
     return;
   }
-
+ 
   if (width == NULL || height == NULL) {
     LOG(LITTLEWIN_ERR, "Width or height pointer is NULL.\n");
     return;
   }
-
+ 
   // Get window dimensions
   XWindowAttributes attributes;
   int status = XGetWindowAttributes(display, window, &attributes);
@@ -156,25 +157,25 @@ static void get_window_dimensions(Display *display, Window window, int *width,
         (unsigned long)window);
     return;
   }
-
+ 
   *width = attributes.width;
   *height = attributes.height;
 }
-
+ 
 static void arrange_window(int window_count, Window windows[], Display *display,
                            int screen) {
   Screen *scr = ScreenOfDisplay(display, screen);
   int screen_width = scr->width;
   int screen_height = scr->height;
-
+ 
   int half_width = screen_width / 2;
   int half_height = screen_height / 2;
-
+ 
   int third_width = screen_width / 3;
-
+ 
   for (int i = 0; i < window_count; i++) {
     int x = 0, y = 0, width = 0, height = 0;
-
+ 
     switch (window_count) {
     case 1:
       // Single window takes full screen
@@ -183,7 +184,7 @@ static void arrange_window(int window_count, Window windows[], Display *display,
       width = screen_width;
       height = screen_height - 5;
       break;
-
+ 
     case 2:
       // Two windows split left and right
       width = half_width;
@@ -191,7 +192,7 @@ static void arrange_window(int window_count, Window windows[], Display *display,
       x = i * half_width;
       y = 0;
       break;
-
+ 
     case 3:
       if (i == 0) {
         // First window occupies left half
@@ -207,7 +208,7 @@ static void arrange_window(int window_count, Window windows[], Display *display,
         height = half_height;
       }
       break;
-
+ 
     case 4:
       // Four windows split into quadrants
       width = half_width;
@@ -215,7 +216,7 @@ static void arrange_window(int window_count, Window windows[], Display *display,
       x = (i % 2) * half_width;
       y = (i / 2) * half_height;
       break;
-
+ 
     case 5:
       if (i == 0) {
         // First window occupies left half
@@ -231,7 +232,7 @@ static void arrange_window(int window_count, Window windows[], Display *display,
         height = half_height;
       }
       break;
-
+ 
     case 6:
       if (i < 2) {
         // Two windows split vertically on the left
@@ -248,11 +249,11 @@ static void arrange_window(int window_count, Window windows[], Display *display,
       }
       break;
     }
-
+ 
     XMoveResizeWindow(display, windows[i], x, y, width, height);
   }
 }
-
+ 
 static Window *fetch_window_list(Display *display, Window root,
                                  unsigned long *nitems, Atom atom,
                                  int workspace_id) {
@@ -260,7 +261,7 @@ static Window *fetch_window_list(Display *display, Window root,
   int actual_format;
   unsigned long bytes_after;
   Window *windows = NULL;
-
+ 
   // Retrieve all windows
   if (XGetWindowProperty(display, root, atom, 0, (~0L), False, XA_WINDOW,
                          &actual_type, &actual_format, nitems, &bytes_after,
@@ -268,7 +269,7 @@ static Window *fetch_window_list(Display *display, Window root,
     LOG(LITTLEWIN_ERR, "Failed to fetch window list.\n");
     return NULL;
   }
-
+ 
   if (*nitems == 0) {
     LOG(LITTLEWIN_INFO, "No windows found.\n");
     if (windows != NULL) {
@@ -276,16 +277,16 @@ static Window *fetch_window_list(Display *display, Window root,
     }
     return NULL;
   }
-
+ 
   Window *filtered_windows = malloc(sizeof(Window) * (*nitems));
   if (filtered_windows == NULL) {
     LOG(LITTLEWIN_ERR, " fail to allocate filtered_windows. \n");
     XFree(windows);
     return NULL;
   }
-
+ 
   unsigned long filtered_count = 0;
-
+ 
   for (unsigned long i = 0; i < *nitems; i++) {
     Window window = windows[i];
     Atom net_wm_desktop = XInternAtom(display, "_NET_WM_DESKTOP", True);
@@ -296,7 +297,7 @@ static Window *fetch_window_list(Display *display, Window root,
       XFree(windows);
       return NULL;
     }
-
+ 
     Atom actual_type;
     int actual_format;
     unsigned long nitems_returned, bytes_after;
@@ -307,29 +308,29 @@ static Window *fetch_window_list(Display *display, Window root,
         data) {
       unsigned long window_workspace_id = *(unsigned long *)data;
       XFree(data);
-
+ 
       if (window_workspace_id == workspace_id) {
         filtered_windows[filtered_count++] = window;
       }
     }
   }
-
+ 
   *nitems = filtered_count;
-
+ 
   if (windows != NULL) {
     XFree(windows);
   }
-
+ 
   return filtered_windows;
 }
-
+ 
 static unsigned long int get_current_workspace(Display *display, Window root) {
   Atom currentDesktopAtom;
   unsigned long *desktop = NULL;
   Atom actualType;
   int actualFormat;
   unsigned long nItems, bytesAfter;
-
+ 
   currentDesktopAtom = XInternAtom(display, "_NET_CURRENT_DESKTOP", True);
   if (currentDesktopAtom == None) {
     LOG(LITTLEWIN_ERR, "_NET_CURRENT_DESKTOP not supported by the window "
@@ -337,7 +338,7 @@ static unsigned long int get_current_workspace(Display *display, Window root) {
     XCloseDisplay(display);
     return -1;
   }
-
+ 
   if (XGetWindowProperty(display, root, currentDesktopAtom, 0, 1, False,
                          XA_CARDINAL, &actualType, &actualFormat, &nItems,
                          &bytesAfter, (unsigned char **)&desktop) == Success &&
@@ -351,7 +352,7 @@ static unsigned long int get_current_workspace(Display *display, Window root) {
     return -1;
   }
 }
-
+ 
 static Window get_last_opened_window(Display *display) {
   Atom net_client_list_stacking =
       XInternAtom(display, "_NET_CLIENT_LIST_STACKING", True);
@@ -360,12 +361,12 @@ static Window get_last_opened_window(Display *display) {
                        "the X server.\n");
     return 0;
   }
-
+ 
   Atom actual_type;
   int actual_format;
   unsigned long nitems, bytes_after;
   unsigned char *data = NULL;
-
+ 
   if (XGetWindowProperty(display, DefaultRootWindow(display),
                          net_client_list_stacking, 0, (~0L), False, XA_WINDOW,
                          &actual_type, &actual_format, &nitems, &bytes_after,
@@ -377,10 +378,10 @@ static Window get_last_opened_window(Display *display) {
     XFree(data);
     return last_window;
   }
-
+ 
   return 0;
 }
-
+ 
 static unsigned long get_total_workspace(Display *display, Window root) {
   Atom actual_type;
   int actual_format;
@@ -388,7 +389,7 @@ static unsigned long get_total_workspace(Display *display, Window root) {
   unsigned char *data = NULL;
   unsigned long total_workspaces = 0;
   Atom desktops_atom = XInternAtom(display, "_NET_NUMBER_OF_DESKTOPS", True);
-
+ 
   if (XGetWindowProperty(display, root, desktops_atom, 0, 1, False, XA_CARDINAL,
                          &actual_type, &actual_format, &nitems, &bytes_after,
                          &data) == Success) {
@@ -401,26 +402,26 @@ static unsigned long get_total_workspace(Display *display, Window root) {
   } else {
     fprintf(stderr, "XGetWindowProperty failed for _NET_NUMBER_OF_DESKTOPS.\n");
   }
-
+ 
   return total_workspaces;
 }
-
+ 
 static int get_total_window(Display *display, Window root) {
   unsigned long total_win = 0;
   int total_workspaces = get_total_workspace(display, root);
-
+ 
   Atom window_list_atom = XInternAtom(display, "_NET_CLIENT_LIST", True);
-
+ 
   for (int i = 0; i <= total_workspaces; i++) {
     unsigned long current_window_count = 0;
     fetch_window_list(display, root, &current_window_count, window_list_atom,
                       i);
     total_win += current_window_count;
   }
-
+ 
   return total_win;
 }
-
+ 
 static void arrange_dimension(Display *display, Window root,
                               unsigned long base_win_items,
                               Window *curr_win_open, win_info *base_win_info,
@@ -430,34 +431,33 @@ static void arrange_dimension(Display *display, Window root,
         (win_info *)malloc(base_win_items * sizeof(win_info));
     get_window_dimensions(display, curr_win_open[i], &curr_win_info[i].width,
                           &curr_win_info[i].height);
-
+ 
     if (curr_win_info[i].width != base_win_info[i].width ||
         curr_win_info[i].height != base_win_info[i].height) {
       unmaximize_window(display, curr_win_open[i]);
       arrange_window(base_win_items, curr_win_open, display, screen);
-
+ 
       base_win_info[i].width = curr_win_info[i].width;
       base_win_info[i].height = curr_win_info[i].height;
     }
-
+ 
     free(curr_win_info);
   }
 }
-
+ 
 static void distribute_overflow_windows(
     Display *display, int *overflow_workspace, int overflow_workspace_total,
     workspace_info *free_workspace, int free_workspace_total,
     Atom window_list_atom, Window root, int screen) {
-  for (int i = 0; i < overflow_workspace_total; i++) {
+  for (int i = 0; i <overflow_workspace_total; i++) {
     unsigned long current_window_count = 0;
     Window *active_windows =
         fetch_window_list(display, root, &current_window_count,
                           window_list_atom, overflow_workspace[i]);
-
-    for (int j = 0; j < free_workspace_total; j++) {
-      for (int x = 0; x < free_workspace[j].available_space; x++) {
+ 
+    for (int j = 0; j <= free_workspace_total; j++) {
+      for (int x = 0; x <= free_workspace[j].available_space; x++) {
         if (current_window_count >= WIN_APP_LIMIT) {
-
           unmaximize_window(display, active_windows[current_window_count--]);
           move_window_to_workspace(display,
                                    active_windows[current_window_count--],
@@ -466,28 +466,29 @@ static void distribute_overflow_windows(
         }
       }
     }
-
+ 
     arrange_window(current_window_count, active_windows, display, screen);
   }
 }
-
+ 
 static void handle_window_overflow(Display *display, Window root,
                                    unsigned long *current_window_count,
                                    Atom window_list_atom, int total_workspace,
                                    int screen) {
   int overflow_workspace[total_workspace];
   int overflow_workspace_total = 0;
-
+ 
   workspace_info free_workspace[total_workspace];
   int free_workspace_total = 0;
-
-  for (int workspace = 0; workspace < total_workspace; workspace++) {
+ 
+  for (int workspace = 0; workspace <=total_workspace; workspace++) {
     Window *active_windows = fetch_window_list(
         display, root, current_window_count, window_list_atom, workspace);
-
+ 
     if (*current_window_count >= WIN_APP_LIMIT) {
-      overflow_workspace[overflow_workspace_total++] = workspace;
-    } else {
+      overflow_workspace[overflow_workspace_total] = workspace;
+      overflow_workspace_total++;
+    } else if (*current_window_count + 1 < WIN_APP_LIMIT){
       int available_space = WIN_APP_LIMIT - *current_window_count;
       free_workspace[free_workspace_total].workspace_id = workspace;
       free_workspace[free_workspace_total].total_window_open =
@@ -496,33 +497,32 @@ static void handle_window_overflow(Display *display, Window root,
       free_workspace_total++;
     }
   }
-
   distribute_overflow_windows(
       display, overflow_workspace, overflow_workspace_total, free_workspace,
       free_workspace_total, window_list_atom, root, screen);
 }
-
+ 
 static void manage_workspace_windows(Display *display, Window root,
                                      unsigned long *previous_window_count,
                                      int total_workspace, int screen) {
   unsigned long current_window_count = 0;
   Atom window_list_atom = XInternAtom(display, "_NET_CLIENT_LIST", True);
   Window *active_windows;
-
-  for (int workspace = 0; workspace <= total_workspace; workspace++) {
+ 
+  for (int workspace = 0; workspace < total_workspace; workspace++) {
     active_windows = fetch_window_list(display, root, &current_window_count,
                                        window_list_atom, workspace);
     if (!active_windows) {
       continue;
     }
-
-    if (current_window_count >= WIN_APP_LIMIT) {
+ 
+    if (current_window_count > WIN_APP_LIMIT) {
       handle_window_overflow(display, root, &current_window_count,
                              window_list_atom, total_workspace, screen);
     }
   }
 }
-
+ 
 static void rearrange_current_workspace(Display *display, Window root,
                                         unsigned long *previous_window_count,
                                         int screen,
@@ -533,36 +533,36 @@ static void rearrange_current_workspace(Display *display, Window root,
   Window *active_windows =
       fetch_window_list(display, root, &current_window_count, window_list_atom,
                         current_workspace);
-
+ 
   if (current_window_count != *previous_window_count) {
     LOG(LITTLEWIN_INFO, "Re-arrange current window items\n");
     *previous_window_count = current_window_count;
-
-    for (unsigned long i = 0; i < current_window_count; i++) {
+ 
+    for (unsigned long i = 0; i <= current_window_count; i++) {
       if (active_windows[i]) {
         unmaximize_window(display, active_windows[i]);
       }
     }
-
+ 
     if (active_windows) {
       arrange_window(current_window_count, active_windows, display, screen);
     }
   }
-
+ 
   arrange_dimension(display, root, current_window_count, active_windows,
                     window_properties, screen);
-
+ 
   if (active_windows) {
     XFree(active_windows);
   }
 }
-
+ 
 const char *detect_desktop_environment() {
   const char *xdg_current_desktop = getenv("XDG_CURRENT_DESKTOP");
   const char *desktop_session = getenv("DESKTOP_SESSION");
   const char *kde_full_session = getenv("KDE_FULL_SESSION");
   const char *gnome_session_id = getenv("GNOME_DESKTOP_SESSION_ID");
-
+ 
   if (kde_full_session && strcmp(kde_full_session, "true") == 0) {
     return "KDE";
   } else if (gnome_session_id ||
@@ -576,29 +576,38 @@ const char *detect_desktop_environment() {
     return "Unknown";
   }
 }
-
-static void set_workspace() {
+ 
+static void create_new_workspace(Display *display, Window root,
+                                 unsigned long new_workspace) {
+  Atom net_current_desktop = XInternAtom(display, "_NET_CURRENT_DESKTOP", True);
+ 
+  // Set the new workspace
+  XChangeProperty(display, root, net_current_desktop, XA_CARDINAL, 32,
+                  PropModeReplace, (unsigned char *)&new_workspace, 1);
+  XSync(display, False); // Ensure the action is committed
+  printf("Switched to workspace %lu\n", new_workspace);
+}
+ 
+ 
+static void set_workspace(Display *display, Window root, unsigned long workspace) {
+  const char *desktop_session = detect_desktop_environment();
+  if (strcmp(desktop_session, "GNOME") == 0) {
+      create_new_workspace(display, root, workspace);
+      return;
+  }
+ 
   pid_t pid = fork(); // Create a new process
-
+ 
   if (pid == -1) {
     perror("Failed to fork");
     return;
   }
-
-  const char *desktop_session = detect_desktop_environment();
+ 
   if (pid == 0) {
-
     if (strcmp(desktop_session, "KDE") == 0) {
       if (execlp("qdbus", "qdbus", "org.kde.KWin", "/VirtualDesktopManager",
                  "createDesktop", "1", "LittleWin", NULL) == -1) {
         perror("Error executing qdbus");
-        _exit(EXIT_FAILURE);
-      }
-    } else if (strcmp(desktop_session, "GNOME") == 0) {
-
-      if (execlp("gsettings", "gsettings", "set", "org.gnome.mutter",
-                 "dynamic-workspaces", "true", NULL) == -1) {
-        perror("Error executing gsettings");
         _exit(EXIT_FAILURE);
       }
     } else {
@@ -613,7 +622,7 @@ static void set_workspace() {
     }
   }
 }
-
+ 
 static void manage_window(Display *display, Window root,
                           unsigned long *previous_window_count,
                           win_info *window_properties, int screen) {
@@ -622,26 +631,26 @@ static void manage_window(Display *display, Window root,
         "No display or prev window count or properties found \n");
     return;
   }
-
+ 
   unsigned long total_workspace = get_total_workspace(display, root);
-
+ 
   manage_workspace_windows(display, root, previous_window_count,
                            total_workspace, screen);
   rearrange_current_workspace(display, root, previous_window_count, screen,
                               window_properties);
 }
-
+ 
 void run_x_layout() {
   Display *display = initialize_display();
   if (!display)
     return;
-
+ 
   int screen = DefaultScreen(display);
   Window root = get_root_window(display);
-
+ 
   unsigned long base_win_items = 0;
   win_info *base_win_info = NULL;
-
+ 
   // Arrange the first window init
   Atom atom = XInternAtom(display, "_NET_CLIENT_LIST", True);
   int base_workspace_num = get_current_workspace(display, root);
@@ -656,31 +665,32 @@ void run_x_layout() {
       exit(EXIT_FAILURE);
       return;
     }
-
+ 
     for (unsigned long int i = 0; i < base_win_items; i++) {
       unmaximize_window(display, windows[i]);
       arrange_window(base_win_items, windows, display, screen);
     }
-
+ 
     XFree(windows);
   }
-
+ 
   unsigned long curr_win_items = 0;
   XSetErrorHandler(error_handler);
-
+ 
   while (1) {
-    int total_workspaces = get_total_workspace(display, root) - 1;
-
+    int total_workspaces = get_total_workspace(display, root);
+ 
     unsigned long total_window = get_total_window(display, root);
     int workspace_need = (int)total_window / WIN_APP_LIMIT;
-
-    if (workspace_need > 0 && total_workspaces <= workspace_need) {
-      set_workspace();
+ 
+    if (total_workspaces <= workspace_need) {
+      set_workspace(display, root, workspace_need);
+      usleep(20000);
     }
-
+ 
     manage_window(display, root, &base_win_items, base_win_info, screen);
     usleep(20000);
   }
-
+ 
   XCloseDisplay(display);
 }
