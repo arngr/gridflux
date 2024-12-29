@@ -612,8 +612,7 @@ static void set_workspace(Display *display, Window root, unsigned long workspace
         _exit(EXIT_FAILURE);
       }
            create_new_workspace(display, root, workspace);
-    }
-  } else {
+    } else {
       int status;
       waitpid(pid, &status, 0);
       if (WIFEXITED(status)) {
