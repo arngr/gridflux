@@ -10,7 +10,8 @@ This project is mainly targeted for users who prefer to manage windows in a more
 # Layout Visualizations
 
 Here are various layout arrangements for windows. The configurations showcase how windows can be arranged in different layouts.
-![example](https://github.com/user-attachments/assets/2d46a00c-1b1a-4e33-becc-c7081cafd3d1)
+
+https://github.com/user-attachments/assets/2d46a00c-1b1a-4e33-becc-c7081cafd3d1
 
 
 ### Note 📌:  
