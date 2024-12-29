@@ -30,7 +30,7 @@
 #include <time.h>
 #include <unistd.h>
 
-const int WIN_APP_LIMIT = 7;
+const int WIN_APP_LIMIT = 5;
 
 static Display *initialize_display() {
   int try_index = 0;
