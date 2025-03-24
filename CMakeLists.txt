@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.10)
-project(littlewin)
+project(gridflux)
 
 set(CMAKE_C_STANDARD 99)
 
@@ -12,14 +12,14 @@ file(GLOB_RECURSE SESSION_SOURCES "${SRC_DIR}/*.c")
 include_directories(${SRC_DIR}/session)
 
 # Create the executable
-add_executable(littlewin ${SRC_DIR}/main.c ${SESSION_SOURCES})
+add_executable(gridflux ${SRC_DIR}/main.c ${SESSION_SOURCES})
 
 
 # Check OS and adjust flags
 if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
     message(STATUS "Operating System: Windows")
     # Windows-specific settings
-    target_link_libraries(littlewin PRIVATE gdi32)
+    target_link_libraries(gridflux PRIVATE gdi32)
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
     message(STATUS "Operating System: macOS")
     # macOS-specific settings (if any)
@@ -46,7 +46,7 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
 
     else()
         message(STATUS "X11 is being used as the display server.")
-        target_link_libraries(littlewin PRIVATE X11)
+        target_link_libraries(gridflux PRIVATE X11)
         execute_process(
             COMMAND xprop -root _NET_WM_NAME
             RESULT_VARIABLE WM_RESULT
@@ -66,12 +66,12 @@ else()
     message(FATAL_ERROR "Unsupported Operating System: ${CMAKE_SYSTEM_NAME}")
 endif()
 
-target_include_directories(littlewin PRIVATE session)
+target_include_directories(gridflux PRIVATE session)
 
 add_custom_target(run
-    COMMAND littlewin 
-    DEPENDS littlewin 
+    COMMAND gridflux 
+    DEPENDS gridflux 
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
 )
 
-set_target_properties(littlewin PROPERTIES CLEAN_COMMAND "rm -f littlewin")
+set_target_properties(gridflux PROPERTIES CLEAN_COMMAND "rm -f gridflux")

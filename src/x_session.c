@@ -18,11 +18,12 @@
  */
 
 #include "x_session.h"
-#include "littlewin.h"
+#include "gridflux.h"
 #include <X11/Xlib.h>
 #include <math.h>
 #include <stdarg.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
@@ -31,6 +32,10 @@
 #include <unistd.h>
 
 const int WIN_APP_LIMIT = 4;
+#define CHANGE_X (1 << 0)
+#define CHANGE_Y (1 << 1)
+#define CHANGE_WIDTH (1 << 2)
+#define CHANGE_HEIGHT (1 << 3)
 
 static Display *initialize_display() {
   int try_index = 0;
@@ -38,7 +43,7 @@ static Display *initialize_display() {
     Display *display = XOpenDisplay(NULL);
     if (!display) {
       try_index++;
-      LOG(LITTLEWIN_ERR, "Cannot open display. Retry %d ... \n", try_index);
+      LOG(GRIDFLUX_ERR, "Cannot open display. Retry %d ... \n", try_index);
       sleep(1);
     } else {
       return display;
@@ -52,12 +57,12 @@ static Window get_root_window(Display *display) {
 
 static int error_handler(Display *display, XErrorEvent *error) {
   if (error->error_code == BadWindow) {
-    LOG(LITTLEWIN_ERR,
+    LOG(GRIDFLUX_ERR,
         "Caught BadWindow error: invalid window ID "
         "0x%lx\n",
         error->resourceid);
   } else {
-    LOG(LITTLEWIN_ERR, " Caught other error: %d\n", error->error_code);
+    LOG(GRIDFLUX_ERR, " Caught other error: %d\n", error->error_code);
   }
   return 0; // Return 0 to prevent the program from terminating
 }
@@ -66,7 +71,7 @@ static int send_client_message(Display *display, Window window,
                                Atom message_type, Atom *atoms, int atom_count,
                                long *data) {
   if (message_type == None) {
-    LOG(LITTLEWIN_ERR, "Unable to retrieve required atom.\n");
+    LOG(GRIDFLUX_ERR, "Unable to retrieve required atom.\n");
     return -1;
   }
 
@@ -83,7 +88,7 @@ static int send_client_message(Display *display, Window window,
   if (!XSendEvent(display, DefaultRootWindow(display), False,
                   SubstructureRedirectMask | SubstructureNotifyMask,
                   (XEvent *)&event)) {
-    LOG(LITTLEWIN_ERR, "Failed to send event.\n");
+    LOG(GRIDFLUX_ERR, "Failed to send event.\n");
     return -1;
   }
 
@@ -97,13 +102,13 @@ static void unmaximize_window(Display *display, Window window) {
   Atom max_vert = XInternAtom(display, "_NET_WM_STATE_MAXIMIZED_VERT", False);
 
   if (wm_state == None || max_horz == None || max_vert == None) {
-    LOG(LITTLEWIN_ERR, "Unable to retrieve required atoms.\n");
+    LOG(GRIDFLUX_ERR, "Unable to retrieve required atoms.\n");
     return;
   }
 
   long data[] = {0, max_horz, max_vert}; // Unmaximize state data
   if (send_client_message(display, window, wm_state, NULL, 3, data) == 0) {
-    LOG(LITTLEWIN_INFO, "Unmaximized window 0x%lx\n", window);
+    LOG(GRIDFLUX_INFO, "Unmaximized window 0x%lx\n", window);
   }
 }
 
@@ -112,7 +117,7 @@ static int move_window_to_workspace(Display *display, Window window,
 
   Atom net_wm_desktop = XInternAtom(display, "_NET_WM_DESKTOP", True);
   if (net_wm_desktop == None) {
-    LOG(LITTLEWIN_ERR,
+    LOG(GRIDFLUX_ERR,
         "_NET_WM_DESKTOP atom is not supported by the X server.\n");
     return -1;
   }
@@ -120,11 +125,11 @@ static int move_window_to_workspace(Display *display, Window window,
   long data[] = {workspace, CurrentTime}; // Move to target workspace
   if (send_client_message(display, window, net_wm_desktop, NULL, 2, data) ==
       0) {
-    LOG(LITTLEWIN_INFO, "Moved window 0x%lx to workspace %d\n", window,
+    LOG(GRIDFLUX_INFO, "Moved window 0x%lx to workspace %d\n", window,
         workspace);
     return 0;
   } else {
-    LOG(LITTLEWIN_ERR,
+    LOG(GRIDFLUX_ERR,
         "Failed to send event to move window 0x%lx to workspace %d.\n", window,
         workspace);
     return -1;
@@ -133,17 +138,17 @@ static int move_window_to_workspace(Display *display, Window window,
 static void get_window_dimensions(Display *display, Window window, int *width,
                                   int *height) {
   if (display == NULL) {
-    LOG(LITTLEWIN_ERR, "Display is NULL.\n");
+    LOG(GRIDFLUX_ERR, "Display is NULL.\n");
     return;
   }
 
   if (window == None) {
-    LOG(LITTLEWIN_ERR, "Invalid window.\n");
+    LOG(GRIDFLUX_ERR, "Invalid window.\n");
     return;
   }
 
   if (width == NULL || height == NULL) {
-    LOG(LITTLEWIN_ERR, "Width or height pointer is NULL.\n");
+    LOG(GRIDFLUX_ERR, "Width or height pointer is NULL.\n");
     return;
   }
 
@@ -151,7 +156,7 @@ static void get_window_dimensions(Display *display, Window window, int *width,
   XWindowAttributes attributes;
   int status = XGetWindowAttributes(display, window, &attributes);
   if (status == 0) {
-    LOG(LITTLEWIN_ERR,
+    LOG(GRIDFLUX_ERR,
         "Error: Failed to get window attributes for window ID: "
         "%lu\n",
         (unsigned long)window);
@@ -160,6 +165,48 @@ static void get_window_dimensions(Display *display, Window window, int *width,
 
   *width = attributes.width;
   *height = attributes.height;
+}
+
+void window_set_geometry(Display *display, Window window, int gravity,
+                         unsigned long mask, int x, int y, int width,
+                         int height) {
+  XSizeHints hints;
+  long supplied_return;
+
+  if (gravity != 0) {
+    Status status =
+        XGetWMNormalHints(display, window, &hints, &supplied_return);
+
+    if (status == 0) {
+      memset(&hints, 0, sizeof(hints));
+      hints.flags = 0;
+    }
+
+    hints.flags |= PWinGravity;
+    hints.win_gravity = gravity;
+    XSetWMNormalHints(display, window, &hints);
+  }
+
+  if (mask & (CHANGE_X | CHANGE_Y | CHANGE_WIDTH | CHANGE_HEIGHT)) {
+    int current_x, current_y;
+    unsigned int current_width, current_height, border_width, depth;
+    Window root;
+
+    if (mask != (CHANGE_X | CHANGE_Y | CHANGE_WIDTH | CHANGE_HEIGHT)) {
+      XGetGeometry(display, window, &root, &current_x, &current_y,
+                   &current_width, &current_height, &border_width, &depth);
+    } else {
+      current_x = current_y = 0;
+      current_width = current_height = 1; // Non-zero defaults
+    }
+
+    int new_x = (mask & CHANGE_X) ? x : current_x;
+    int new_y = (mask & CHANGE_Y) ? y : current_y;
+    unsigned int new_width = (mask & CHANGE_WIDTH) ? width : current_width;
+    unsigned int new_height = (mask & CHANGE_HEIGHT) ? height : current_height;
+
+    XMoveResizeWindow(display, window, new_x, new_y, new_width, new_height);
+  }
 }
 
 static void arrange_window(int window_count, Window windows[], Display *display,
@@ -250,7 +297,9 @@ static void arrange_window(int window_count, Window windows[], Display *display,
       break;
     }
 
-    XMoveResizeWindow(display, windows[i], x, y, width, height);
+    window_set_geometry(display, windows[i], StaticGravity,
+                        CHANGE_X | CHANGE_Y | CHANGE_WIDTH | CHANGE_HEIGHT, x,
+                        y, width, height);
   }
 }
 
@@ -266,12 +315,12 @@ static Window *fetch_window_list(Display *display, Window root,
   if (XGetWindowProperty(display, root, atom, 0, (~0L), False, XA_WINDOW,
                          &actual_type, &actual_format, nitems, &bytes_after,
                          (unsigned char **)&windows) != Success) {
-    LOG(LITTLEWIN_ERR, "Failed to fetch window list.\n");
+    LOG(GRIDFLUX_ERR, "Failed to fetch window list.\n");
     return NULL;
   }
 
   if (*nitems == 0) {
-    LOG(LITTLEWIN_INFO, "No windows found.\n");
+    LOG(GRIDFLUX_INFO, "No windows found.\n");
     if (windows != NULL) {
       XFree(windows);
     }
@@ -280,7 +329,7 @@ static Window *fetch_window_list(Display *display, Window root,
 
   Window *filtered_windows = malloc(sizeof(Window) * (*nitems));
   if (filtered_windows == NULL) {
-    LOG(LITTLEWIN_ERR, " fail to allocate filtered_windows. \n");
+    LOG(GRIDFLUX_ERR, " fail to allocate filtered_windows. \n");
     XFree(windows);
     return NULL;
   }
@@ -291,7 +340,7 @@ static Window *fetch_window_list(Display *display, Window root,
     Window window = windows[i];
     Atom net_wm_desktop = XInternAtom(display, "_NET_WM_DESKTOP", True);
     if (net_wm_desktop == None) {
-      LOG(LITTLEWIN_WARN, "_NET_WM_DESKTOP atom is not supported by the "
+      LOG(GRIDFLUX_WARN, "_NET_WM_DESKTOP atom is not supported by the "
                           "X server.\n");
       XFree(filtered_windows);
       XFree(windows);
@@ -333,7 +382,7 @@ static unsigned long int get_current_workspace(Display *display, Window root) {
 
   currentDesktopAtom = XInternAtom(display, "_NET_CURRENT_DESKTOP", True);
   if (currentDesktopAtom == None) {
-    LOG(LITTLEWIN_ERR, "_NET_CURRENT_DESKTOP not supported by the window "
+    LOG(GRIDFLUX_ERR, "_NET_CURRENT_DESKTOP not supported by the window "
                        "manager\n");
     XCloseDisplay(display);
     return -1;
@@ -347,7 +396,7 @@ static unsigned long int get_current_workspace(Display *display, Window root) {
     XFree(desktop);
     return workspaceNumber;
   } else {
-    LOG(LITTLEWIN_ERR, "Failed to get the current desktop\n");
+    LOG(GRIDFLUX_ERR, "Failed to get the current desktop\n");
     XCloseDisplay(display);
     return -1;
   }
@@ -357,7 +406,7 @@ static Window get_last_opened_window(Display *display) {
   Atom net_client_list_stacking =
       XInternAtom(display, "_NET_CLIENT_LIST_STACKING", True);
   if (net_client_list_stacking == None) {
-    LOG(LITTLEWIN_ERR, "_NET_CLIENT_LIST_STACKING atom is not supported by "
+    LOG(GRIDFLUX_ERR, "_NET_CLIENT_LIST_STACKING atom is not supported by "
                        "the X server.\n");
     return 0;
   }
@@ -535,7 +584,7 @@ static void rearrange_current_workspace(Display *display, Window root,
                         current_workspace);
 
   if (current_window_count != *previous_window_count) {
-    LOG(LITTLEWIN_INFO, "Re-arrange current window items\n");
+    LOG(GRIDFLUX_INFO, "Re-arrange current window items\n");
     *previous_window_count = current_window_count;
 
     for (unsigned long i = 0; i <= current_window_count; i++) {
@@ -592,7 +641,7 @@ static void set_workspace(Display *display, Window root,
                           unsigned long workspace) {
   const char *desktop_session = detect_desktop_environment();
   if (desktop_session == NULL || strcmp(desktop_session, "Unknown") == 0) {
-    LOG(LITTLEWIN_DBG, "No desktop session detected. Exiting.\n");
+    LOG(GRIDFLUX_DBG, "No desktop session detected. Exiting.\n");
     return;
   }
 
@@ -621,7 +670,7 @@ static void set_workspace(Display *display, Window root,
       int status;
       waitpid(pid, &status, 0);
       if (WIFEXITED(status)) {
-        LOG(LITTLEWIN_DBG, "command exited with status %d\n",
+        LOG(GRIDFLUX_DBG, "command exited with status %d\n",
             WEXITSTATUS(status));
       } else {
         perror("command did not terminate normally\n");
@@ -635,7 +684,7 @@ static void manage_window(Display *display, Window root,
                           unsigned long *previous_window_count,
                           win_info *window_properties, int screen) {
   if (!display) {
-    LOG(LITTLEWIN_WARN,
+    LOG(GRIDFLUX_WARN,
         "No display or prev window count or properties found \n");
     return;
   }
@@ -667,7 +716,7 @@ void run_x_layout() {
   if (windows) {
     base_win_info = (win_info *)malloc(base_win_items * sizeof(win_info));
     if (base_win_info == NULL) {
-      LOG(LITTLEWIN_WARN, " Memory allocation failed.\n");
+      LOG(GRIDFLUX_WARN, " Memory allocation failed.\n");
       free(windows);
       XCloseDisplay(display);
       exit(EXIT_FAILURE);

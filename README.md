@@ -1,9 +1,9 @@
 
 ---
 
-# littlewin
+# gridflux
 
-`littlewin` is stand for "Window Management",  a window management tool inspired by tiling window managers. Unlike tiling window managers, `littlewin` allows you to manage application windows without relying on a full tiling manager. It's designed to provide flexibility for arranging and managing windows in a non-intrusive way, without imposing a tiling window management style.
+`gridflux` is stand for "Window Management",  a window management tool inspired by tiling window managers. Unlike tiling window managers, `gridflux` allows you to manage application windows without relying on a full tiling manager. It's designed to provide flexibility for arranging and managing windows in a non-intrusive way, without imposing a tiling window management style.
 
 This project is mainly targeted for users who prefer to manage windows in a more manual, customizable fashion while still benefiting from automation in tasks such as window resizing, arrangement, and workspace management. ⚙️
 
@@ -15,7 +15,7 @@ https://github.com/user-attachments/assets/2d46a00c-1b1a-4e33-becc-c7081cafd3d1
 
 
 ### Note 📌:  
-Currently, `littlewin` **only supports Linux with X11**. It won’t work on Wayland or other windowing systems, and it’s not available on other operating systems (like macOS or Windows) at this time.
+Currently, `gridflux` **only supports Linux with X11**. It won’t work on Wayland or other windowing systems, and it’s not available on other operating systems (like macOS or Windows) at this time.
 
 ---
 
@@ -31,15 +31,15 @@ Make sure you have the following installed:
 ### Clone the Repository 📂
 
 ```bash
-git clone https://github.com/zyxidra/littlewin.git
-cd littlewin
+git clone https://github.com/zyxidra/gridflux.git
+cd gridflux
 chmod +x install.sh
 ./install.sh
 ```
 
 ### Build the Project ⚙️
 
-If you're using `make`, run the following commands to build `littlewin`:
+If you're using `make`, run the following commands to build `gridflux`:
 
 ```bash
 make
@@ -58,10 +58,10 @@ make
 
 ## Usage 🚀
 
-Once compiled, you can run the `littlewin` executable to manage your windows. For example:
+Once compiled, you can run the `gridflux` executable to manage your windows. For example:
 
 ```bash
-./littlewin
+./gridflux
 ```
 
 ---
