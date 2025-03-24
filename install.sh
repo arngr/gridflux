@@ -76,7 +76,7 @@ After=graphical.target
 [Service]
 ExecStart=$INSTALL_DIR/gridflux
 User=$USER_NAME
-Environment=DISPLAY=:1
+Environment=DISPLAY=:0
 Environment=XDG_SESSION_TYPE=$XDG_SESSION_TYPE   # Pass the session type environment variable
 Restart=always
 RestartSec=3
@@ -101,7 +101,6 @@ activate_dynamic_workspaces() {
     # Disable fixed desktop count and allow dynamic desktops
     kwriteconfig5 --file kwinrc NumberOfDesktops 0 # 0 means dynamic desktop count
     kwriteconfig5 --file kwinrc CurrentDesktop 1   # Start with desktop 1
-    qdbus org.kde.KWin /KWin reconfigure           # Apply changes
 
     echo "Dynamic virtual desktops enabled in KDE."
   else

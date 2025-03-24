@@ -341,7 +341,7 @@ static Window *fetch_window_list(Display *display, Window root,
     Atom net_wm_desktop = XInternAtom(display, "_NET_WM_DESKTOP", True);
     if (net_wm_desktop == None) {
       LOG(GRIDFLUX_WARN, "_NET_WM_DESKTOP atom is not supported by the "
-                          "X server.\n");
+                         "X server.\n");
       XFree(filtered_windows);
       XFree(windows);
       return NULL;
@@ -383,7 +383,7 @@ static unsigned long int get_current_workspace(Display *display, Window root) {
   currentDesktopAtom = XInternAtom(display, "_NET_CURRENT_DESKTOP", True);
   if (currentDesktopAtom == None) {
     LOG(GRIDFLUX_ERR, "_NET_CURRENT_DESKTOP not supported by the window "
-                       "manager\n");
+                      "manager\n");
     XCloseDisplay(display);
     return -1;
   }
@@ -407,7 +407,7 @@ static Window get_last_opened_window(Display *display) {
       XInternAtom(display, "_NET_CLIENT_LIST_STACKING", True);
   if (net_client_list_stacking == None) {
     LOG(GRIDFLUX_ERR, "_NET_CLIENT_LIST_STACKING atom is not supported by "
-                       "the X server.\n");
+                      "the X server.\n");
     return 0;
   }
 
@@ -699,8 +699,10 @@ static void manage_window(Display *display, Window root,
 
 void run_x_layout() {
   Display *display = initialize_display();
-  if (!display)
+  if (!display) {
+    LOG(GRIDFLUX_ERR, " Fail to init display. \n");
     return;
+  }
 
   int screen = DefaultScreen(display);
   Window root = get_root_window(display);
