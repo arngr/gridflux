@@ -167,11 +167,47 @@ static void get_window_dimensions(Display *display, Window window, int *width,
   *height = attributes.height;
 }
 
+int is_excluded_window(Display *display, Window window) {
+  Atom type_atom = XInternAtom(display, "_NET_WM_WINDOW_TYPE", False);
+  Atom tooltip_atom =
+      XInternAtom(display, "_NET_WM_WINDOW_TYPE_TOOLTIP", False);
+  Atom notification_atom =
+      XInternAtom(display, "_NET_WM_WINDOW_TYPE_NOTIFICATION", False);
+  Atom toolbar_atom =
+      XInternAtom(display, "_NET_WM_WINDOW_TYPE_TOOLBAR", False);
+
+  Atom actual_type;
+  int actual_format;
+  unsigned long nitems, bytes_after;
+  unsigned char *prop = NULL;
+
+  if (XGetWindowProperty(display, window, type_atom, 0, sizeof(Atom), False,
+                         XA_ATOM, &actual_type, &actual_format, &nitems,
+                         &bytes_after, &prop) == Success &&
+      prop) {
+    Atom *atoms = (Atom *)prop;
+    for (unsigned long i = 0; i < nitems; i++) {
+      if (atoms[i] == tooltip_atom || atoms[i] == notification_atom ||
+          atoms[i] == toolbar_atom) {
+        XFree(prop);
+        return 1;
+      }
+    }
+    XFree(prop);
+  }
+  return 0;
+}
+
 void window_set_geometry(Display *display, Window window, int gravity,
                          unsigned long mask, int x, int y, int width,
                          int height) {
   XSizeHints hints;
   long supplied_return;
+
+  if (is_excluded_window(display, window)) {
+    LOG(GRIDFLUX_DBG, " Excluded window. \n");
+    return;
+  }
 
   if (gravity != 0) {
     Status status =
