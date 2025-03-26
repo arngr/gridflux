@@ -18,6 +18,7 @@
  */
 
 #include <stdio.h>
+#include <time.h>
 
 #define GRIDFLUX_ERR 1
 #define GRIDFLUX_WARN 2
@@ -35,6 +36,14 @@
 #define LOG(level, fmt, ...)                                                   \
   do {                                                                         \
     if (level <= CURRENT_LOG_LEVEL) {                                          \
+      time_t rawtime;                                                          \
+      struct tm *timeinfo;                                                     \
+      char timeStr[20];                                                        \
+                                                                               \
+      time(&rawtime);                                                          \
+      timeinfo = localtime(&rawtime);                                          \
+      strftime(timeStr, sizeof(timeStr), "%Y-%m-%d %H:%M:%S", timeinfo);       \
+                                                                               \
       const char *color = RESET;                                               \
       switch (level) {                                                         \
       case GRIDFLUX_ERR:                                                       \
@@ -53,6 +62,6 @@
         color = RESET;                                                         \
         break;                                                                 \
       }                                                                        \
-      printf("%s[%s] " fmt RESET, color, #level, ##__VA_ARGS__);               \
+      printf("%s[%s] [%s] " fmt RESET, color, timeStr, #level, ##__VA_ARGS__); \
     }                                                                          \
   } while (0)

@@ -20,7 +20,6 @@
 #include "x_session.h"
 #include "gridflux.h"
 #include <X11/Xlib.h>
-#include <math.h>
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -253,7 +252,6 @@ static void arrange_window(int window_count, Window windows[], Display *display,
 
   int half_width = screen_width / 2;
   int half_height = screen_height / 2;
-
   int third_width = screen_width / 3;
 
   for (int i = 0; i < window_count; i++) {
@@ -339,6 +337,56 @@ static void arrange_window(int window_count, Window windows[], Display *display,
   }
 }
 
+int is_window_minimized(Display *display, Window window) {
+  Atom actual_type;
+  int actual_format;
+  unsigned long nitems, bytes_after;
+  unsigned char *prop = NULL;
+  int is_minimized = 0;
+
+  Atom net_wm_state = XInternAtom(display, "_NET_WM_STATE", False);
+  Atom net_wm_state_hidden =
+      XInternAtom(display, "_NET_WM_STATE_HIDDEN", False);
+
+  if (XGetWindowProperty(display, window, net_wm_state, 0, 1024, False, XA_ATOM,
+                         &actual_type, &actual_format, &nitems, &bytes_after,
+                         &prop) == Success) {
+
+    if (prop != NULL) {
+      Atom *states = (Atom *)prop;
+
+      for (unsigned long i = 0; i < nitems; i++) {
+        if (states[i] == net_wm_state_hidden) {
+          is_minimized = 1;
+          break;
+        }
+      }
+
+      XFree(prop);
+    }
+  }
+
+  if (!is_minimized) {
+    Atom wm_state = XInternAtom(display, "WM_STATE", False);
+    if (XGetWindowProperty(display, window, wm_state, 0, 2, False, wm_state,
+                           &actual_type, &actual_format, &nitems, &bytes_after,
+                           &prop) == Success) {
+
+      if (prop != NULL) {
+        long *state = (long *)prop;
+
+        if (nitems && *state == 3) {
+          is_minimized = 1;
+        }
+
+        XFree(prop);
+      }
+    }
+  }
+
+  return is_minimized;
+}
+
 static Window *fetch_window_list(Display *display, Window root,
                                  unsigned long *nitems, Atom atom,
                                  int workspace_id) {
@@ -347,7 +395,6 @@ static Window *fetch_window_list(Display *display, Window root,
   unsigned long bytes_after;
   Window *windows = NULL;
 
-  // Retrieve all windows
   if (XGetWindowProperty(display, root, atom, 0, (~0L), False, XA_WINDOW,
                          &actual_type, &actual_format, nitems, &bytes_after,
                          (unsigned char **)&windows) != Success) {
@@ -374,6 +421,10 @@ static Window *fetch_window_list(Display *display, Window root,
 
   for (unsigned long i = 0; i < *nitems; i++) {
     Window window = windows[i];
+
+    if (is_window_minimized(display, window))
+      continue;
+
     Atom net_wm_desktop = XInternAtom(display, "_NET_WM_DESKTOP", True);
     if (net_wm_desktop == None) {
       LOG(GRIDFLUX_WARN, "_NET_WM_DESKTOP atom is not supported by the "
@@ -501,7 +552,6 @@ static int get_total_window(Display *display, Window root) {
     unsigned long current_window_count = 0;
     fetch_window_list(display, root, &current_window_count, window_list_atom,
                       i);
-    total_win += current_window_count;
   }
 
   return total_win;
