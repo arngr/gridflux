@@ -27,6 +27,11 @@
 
 #define CURRENT_LOG_LEVEL GRIDFLUX_DBG
 
+#define CHANGE_X (1 << 0)
+#define CHANGE_Y (1 << 1)
+#define CHANGE_WIDTH (1 << 2)
+#define CHANGE_HEIGHT (1 << 3)
+
 #define RED "\x1b[31m"
 #define YELLOW "\x1b[33m"
 #define GREEN "\x1b[32m"
@@ -45,23 +50,28 @@
       strftime(timeStr, sizeof(timeStr), "%Y-%m-%d %H:%M:%S", timeinfo);       \
                                                                                \
       const char *color = RESET;                                               \
+      const char *level_str = "UNKNOWN";                                       \
+                                                                               \
       switch (level) {                                                         \
       case GRIDFLUX_ERR:                                                       \
         color = RED;                                                           \
+        level_str = "ERROR";                                                   \
         break;                                                                 \
       case GRIDFLUX_WARN:                                                      \
         color = YELLOW;                                                        \
+        level_str = "WARNING";                                                 \
         break;                                                                 \
       case GRIDFLUX_INFO:                                                      \
         color = GREEN;                                                         \
+        level_str = "INFO";                                                    \
         break;                                                                 \
       case GRIDFLUX_DBG:                                                       \
         color = BLUE;                                                          \
-        break;                                                                 \
-      default:                                                                 \
-        color = RESET;                                                         \
+        level_str = "DEBUG";                                                   \
         break;                                                                 \
       }                                                                        \
-      printf("%s[%s] [%s] " fmt RESET, color, timeStr, #level, ##__VA_ARGS__); \
+                                                                               \
+      printf("%s[%s] [%s] [%s:%d] %s(): " fmt RESET "\n", color, timeStr,      \
+             level_str, __FILE__, __LINE__, __func__, ##__VA_ARGS__);          \
     }                                                                          \
   } while (0)

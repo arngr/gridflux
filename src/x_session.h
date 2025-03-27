@@ -18,6 +18,9 @@
  * Copyright (C) 2024 Ardinugraha
  */
 
+#ifndef X_SESSION_H
+#define X_SESSION_H
+
 #include "gridflux.h"
 #include <X11/X.h>
 #include <X11/Xatom.h>
@@ -40,3 +43,8 @@ typedef struct workspace_information {
 } workspace_info;
 
 void run_x_layout();
+void window_set_geometry(Display *display, Window window, int gravity,
+                         unsigned long mask, int x, int y, int width,
+                         int height);
+
+#endif

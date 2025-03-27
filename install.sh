@@ -76,7 +76,7 @@ After=graphical.target
 [Service]
 ExecStart=$INSTALL_DIR/gridflux
 User=$USER_NAME
-Environment=DISPLAY=:0
+Environment=DISPLAY=:1
 Environment=XDG_SESSION_TYPE=$XDG_SESSION_TYPE   # Pass the session type environment variable
 Restart=always
 RestartSec=3
