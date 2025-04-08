@@ -1,3 +1,4 @@
+
 /*
  * This file is part of gridflux.
  *
@@ -14,24 +15,26 @@
  * You should have received a copy of the GNU General Public License
  * along with gridflux.  If not, see <https://www.gnu.org/licenses/>.
  *
- * Copyright (C) 2024 Ardi Nugraha
+ * Copyright (C) 2025 Ardinugraha
  */
 
-#include "x_session.h"
+#ifndef GF_ARRANGE_H
+#define GF_ARRANGE_H
 
-int main() {
-#ifdef __linux
-  char *session_type = getenv("XDG_SESSION_TYPE");
-  if (session_type != NULL) {
-    if (strcmp(session_type, "x11") == 0) {
-      LOG(GRIDFLUX_INFO, " X11 Session detected. \n");
-      run_x_layout();
-    } else {
-      printf("The session %s type is not supported.\n", session_type);
-    }
-  } else {
-    printf("The session is not set.\n");
-  }
+typedef void (*gf_set_geometry_func)(void *window, int x, int y, int width,
+                                     int height, void *user_data, char *sess);
+
+typedef struct {
+  gf_set_geometry_func set_geometry;
+  void *user_data;
+  char *session;
+} gf_split_ctx;
+
+void gf_set_geometry(void *window_ptr, int x, int y, int width, int height,
+                     void *user_data, char *session);
+
+void gf_split_window_generic(void **windows, int window_count, int x, int y,
+                             int width, int height, int depth,
+                             gf_split_ctx *ctx);
+
 #endif
-  return 0;
-}

@@ -32,9 +32,11 @@ typedef struct {
   Atom client_list_stack;
   Atom num_of_desktop;
   Atom net_curr_desktop;
-} atoms_type;
 
-extern atoms_type atoms;
-void init_atoms(Display *display);
+  Atom motif_wm_hints;
+} gf_atom_type;
+
+extern gf_atom_type atoms;
+void gf_init_atom(Display *display);
 
 #endif // ATOMS_H

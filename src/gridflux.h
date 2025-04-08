@@ -17,20 +17,17 @@
  * Copyright (C) 2024 Ardinugraha
  */
 
+#ifndef GF_H
+#define GF_H
 #include <stdio.h>
 #include <time.h>
 
-#define GRIDFLUX_ERR 1
-#define GRIDFLUX_WARN 2
-#define GRIDFLUX_INFO 3
-#define GRIDFLUX_DBG 4
+#define GF_ERR 1
+#define GF_WARN 2
+#define GF_INFO 3
+#define GF_DBG 4
 
-#define CURRENT_LOG_LEVEL GRIDFLUX_DBG
-
-#define CHANGE_X (1 << 0)
-#define CHANGE_Y (1 << 1)
-#define CHANGE_WIDTH (1 << 2)
-#define CHANGE_HEIGHT (1 << 3)
+#define CURRENT_LOG_LEVEL GF_DBG
 
 #define RED "\x1b[31m"
 #define YELLOW "\x1b[33m"
@@ -38,6 +35,7 @@
 #define BLUE "\x1b[34m"
 #define RESET "\x1b[0m"
 
+#ifdef DEBUG_MODE
 #define LOG(level, fmt, ...)                                                   \
   do {                                                                         \
     if (level <= CURRENT_LOG_LEVEL) {                                          \
@@ -53,19 +51,19 @@
       const char *level_str = "UNKNOWN";                                       \
                                                                                \
       switch (level) {                                                         \
-      case GRIDFLUX_ERR:                                                       \
+      case GF_ERR:                                                       \
         color = RED;                                                           \
         level_str = "ERROR";                                                   \
         break;                                                                 \
-      case GRIDFLUX_WARN:                                                      \
+      case GF_WARN:                                                      \
         color = YELLOW;                                                        \
         level_str = "WARNING";                                                 \
         break;                                                                 \
-      case GRIDFLUX_INFO:                                                      \
+      case GF_INFO:                                                      \
         color = GREEN;                                                         \
         level_str = "INFO";                                                    \
         break;                                                                 \
-      case GRIDFLUX_DBG:                                                       \
+      case GF_DBG:                                                       \
         color = BLUE;                                                          \
         level_str = "DEBUG";                                                   \
         break;                                                                 \
@@ -75,3 +73,46 @@
              level_str, __FILE__, __LINE__, __func__, ##__VA_ARGS__);          \
     }                                                                          \
   } while (0)
+#else
+#define LOG(level, fmt, ...)                                                   \
+  do {                                                                         \
+    if (level <= CURRENT_LOG_LEVEL) {                                          \
+      time_t rawtime;                                                          \
+      struct tm *timeinfo;                                                     \
+      char timeStr[20];                                                        \
+                                                                               \
+      time(&rawtime);                                                          \
+      timeinfo = localtime(&rawtime);                                          \
+      strftime(timeStr, sizeof(timeStr), "%Y-%m-%d %H:%M:%S", timeinfo);       \
+                                                                               \
+      const char *color = RESET;                                               \
+      const char *level_str = "UNKNOWN";                                       \
+                                                                               \
+      switch (level) {                                                         \
+      case GF_ERR:                                                       \
+        color = RED;                                                           \
+        level_str = "ERROR";                                                   \
+        break;                                                                 \
+      case GF_WARN:                                                      \
+        color = YELLOW;                                                        \
+        level_str = "WARNING";                                                 \
+        break;                                                                 \
+      case GF_INFO:                                                      \
+        color = GREEN;                                                         \
+        level_str = "INFO";                                                    \
+        break;                                                                 \
+      case GF_DBG:                                                       \
+        color = BLUE;                                                          \
+        level_str = "DEBUG";                                                   \
+        break;                                                                 \
+      }                                                                        \
+                                                                               \
+      printf("%s[%s] [%s] %s(): " fmt RESET "\n", color, timeStr, level_str,   \
+             __func__, ##__VA_ARGS__);                                         \
+    }                                                                          \
+  } while (0)
+#endif
+
+#define GF_X11 "x11"
+
+#endif

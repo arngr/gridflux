@@ -50,7 +50,7 @@ install_dependencies() {
 
 build_and_install() {
   echo "Building the project..."
-  cmake .
+  cmake -B build -DDEBUG_MODE=OFF .
   make
 
   echo "Installing gridflux to $INSTALL_DIR..."

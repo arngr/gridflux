@@ -1,4 +1,3 @@
-
 /*
  * This file is part of gridflux.
  *
@@ -15,36 +14,27 @@
  * You should have received a copy of the GNU General Public License
  * along with gridflux.  If not, see <https://www.gnu.org/licenses/>.
  *
- * Copyright (C) 2024 Ardinugraha
+ * Copyright (C) 2024 Ardi Nugraha
  */
 
-#ifndef X_SESSION_H
-#define X_SESSION_H
-
 #include "gridflux.h"
-#include <X11/X.h>
-#include <X11/Xatom.h>
-#include <X11/Xlib.h>
-#include <X11/Xutil.h>
+#include "xsession.h"
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
 
-typedef struct window_information {
-  Window window;
-  int height;
-  int width;
-} win_info;
-
-typedef struct workspace_information {
-  int workspace_id;
-  int total_window_open;
-  int available_space;
-} workspace_info;
-
-void run_x_layout();
-void window_set_geometry(Display *display, Window window, int gravity,
-                         unsigned long mask, int x, int y, int width,
-                         int height);
-
+int main() {
+#ifdef __linux
+  char *session_type = getenv("XDG_SESSION_TYPE");
+  if (session_type != NULL) {
+    if (strcmp(session_type, GF_X11) == 0) {
+      LOG(GF_INFO, " X11 Session detected. \n");
+      wm_x_run_layout();
+    } else {
+      printf("The session %s type is not supported.\n", session_type);
+    }
+  } else {
+    printf("The session is not set.\n");
+  }
 #endif
+  return 0;
+}
