@@ -147,6 +147,8 @@ int wm_x_excluded_window(Display *display, Window window) {
           states[i] == atoms.net_wm_popup_menu ||
           states[i] == atoms.net_wm_tooltip ||
           states[i] == atoms.net_wm_toolbar ||
+          states[i] == atoms.net_wm_modal ||
+          states[i] == atoms.net_wm_skip_taskbar ||
           states[i] == atoms.net_wm_utility) {
         result = 1;
         break;
@@ -163,21 +165,8 @@ int wm_x_excluded_window(Display *display, Window window) {
 void wm_x_set_geometry(Display *display, Window window, int gravity,
                        unsigned long mask, int x, int y, int width,
                        int height) {
-  XSizeHints hints;
-  long supplied_return;
-
-  if (gravity != 0) {
-    Status status =
-        XGetWMNormalHints(display, window, &hints, &supplied_return);
-    if (status == 0) {
-      memset(&hints, 0, sizeof(hints));
-      hints.flags = 0;
-    }
-
-    hints.flags |= PWinGravity;
-    hints.win_gravity = gravity;
-    XSetWMNormalHints(display, window, &hints);
-  }
+  char *win_name = NULL;
+  XFetchName(display, window, &win_name);
 
   int pad = (mask & APPLY_PADDING) ? DEFAULT_PADDING : 0;
   x += pad;
@@ -185,54 +174,36 @@ void wm_x_set_geometry(Display *display, Window window, int gravity,
   width = width > pad * 2 ? width - pad * 2 : width;
   height = height > pad * 2 ? height - pad * 2 : height;
 
-  // Remove decorations using _MOTIF_WM_HINTS (optional)
-  if (mask & HINT_NO_DECORATIONS) {
-    struct {
-      unsigned long flags;
-      unsigned long functions;
-      unsigned long decorations;
-      long input_mode;
-      unsigned long status;
-    } hints = {2, 0, 0, 0, 0}; // decorations = 0 → no border/titlebar
+  XEvent ev;
+  memset(&ev, 0, sizeof(ev));
+  ev.xclient.type = ClientMessage;
+  ev.xclient.message_type = atoms.net_moveresize_window;
+  ev.xclient.display = display;
+  ev.xclient.window = window;
+  ev.xclient.format = 32;
 
-    XChangeProperty(display, window, atoms.motif_wm_hints, atoms.motif_wm_hints,
-                    32, PropModeReplace, (unsigned char *)&hints, 5);
-  }
+  // Flags: gravity + X + Y + Width + Height
+  ev.xclient.data.l[0] =
+      (gravity << 12) | (1 | 2 | 4 | 8); // bits for x/y/width/height
+  ev.xclient.data.l[1] = x;
+  ev.xclient.data.l[2] = y;
+  ev.xclient.data.l[3] = width;
+  ev.xclient.data.l[4] = height;
 
-  XWindowChanges changes;
-  unsigned int value_mask = 0;
+  Window root = DefaultRootWindow(display);
+  Status result =
+      XSendEvent(display, root, False,
+                 SubstructureRedirectMask | SubstructureNotifyMask, &ev);
 
-  if ((mask & (CHANGE_X | CHANGE_Y | CHANGE_WIDTH | CHANGE_HEIGHT)) !=
-      (CHANGE_X | CHANGE_Y | CHANGE_WIDTH | CHANGE_HEIGHT)) {
-    Window root;
-    int cur_x, cur_y;
-    unsigned int cur_width, cur_height, border, depth;
-
-    XGetGeometry(display, window, &root, &cur_x, &cur_y, &cur_width,
-                 &cur_height, &border, &depth);
-
-    changes.x = (mask & CHANGE_X) ? x : cur_x;
-    changes.y = (mask & CHANGE_Y) ? y : cur_y;
-    changes.width = (mask & CHANGE_WIDTH) ? width : cur_width;
-    changes.height = (mask & CHANGE_HEIGHT) ? height : cur_height;
-  } else {
-    changes.x = x;
-    changes.y = y;
-    changes.width = width;
-    changes.height = height;
-  }
-
-  if (mask & CHANGE_X)
-    value_mask |= CWX;
-  if (mask & CHANGE_Y)
-    value_mask |= CWY;
-  if (mask & CHANGE_WIDTH)
-    value_mask |= CWWidth;
-  if (mask & CHANGE_HEIGHT)
-    value_mask |= CWHeight;
-
-  XConfigureWindow(display, window, value_mask, &changes);
   XFlush(display);
+
+  LOG(GF_INFO,
+      "Set geometry via _NET_MOVERESIZE_WINDOW for 0x%lx \"%s\": "
+      "x=%d y=%d w=%d h=%d [result=%d]",
+      window, win_name ? win_name : "(unnamed)", x, y, width, height, result);
+
+  if (win_name)
+    XFree(win_name);
 }
 
 static void wm_x_arrange_window(int window_count, Window windows[],

@@ -34,4 +34,11 @@ void gf_init_atom(Display *display) {
   atoms.num_of_desktop = XInternAtom(display, "_NET_NUMBER_OF_DESKTOPS", True);
   atoms.net_curr_desktop = XInternAtom(display, "_NET_CURRENT_DESKTOP", True);
   atoms.motif_wm_hints = XInternAtom(display, "_MOTIF_WM_HINTS", False);
+  atoms.net_wm_modal = XInternAtom(display, "_NET_WM_STATE_MODAL", False);
+  atoms.net_wm_skip_taskbar =
+      XInternAtom(display, "_NET_WM_STATE_SKIP_TASKBAR", False);
+  atoms.net_frame_extents = XInternAtom(display, "_NET_FRAME_EXTENTS", False);
+  atoms.gtk_frame_extents = XInternAtom(display, "_GTK_FRAME_EXTENTS", False);
+  atoms.net_moveresize_window =
+      XInternAtom(display, "_NET_MOVERESIZE_WINDOW", False);
 }

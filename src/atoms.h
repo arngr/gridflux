@@ -34,6 +34,11 @@ typedef struct {
   Atom net_curr_desktop;
 
   Atom motif_wm_hints;
+  Atom net_wm_modal;
+  Atom net_wm_skip_taskbar;
+  Atom gtk_frame_extents;
+  Atom net_frame_extents;
+  Atom net_moveresize_window;
 } gf_atom_type;
 
 extern gf_atom_type atoms;
