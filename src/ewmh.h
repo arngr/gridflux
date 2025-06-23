@@ -17,8 +17,10 @@
  * Copyright (C) 2025 Ardinugraha
  */
 
-#ifndef GF_ARRANGE_H
-#define GF_ARRANGE_H
+#ifndef GF_EWMH
+#define GF_EWMH
+
+#include <X11/Xlib.h>
 
 #define ERR_DISPLAY_NULL "Display is NULL"
 #define ERR_WINDOW_INVALID "Invalid window"
@@ -37,17 +39,6 @@ typedef struct {
   void *user_data;
   char *session;
 } gf_split_ctx;
-
-void gf_set_geometry(void *window_ptr, int x, int y, int width, int height,
-                     void *user_data, char *session);
-
-void gf_split_window_generic(void **windows, int window_count, int x, int y,
-                             int width, int height, int depth,
-                             gf_split_ctx *ctx);
-
-#ifdef __linux__ // Only include X11 code on Linux systems
-
-#include <X11/Xlib.h>
 
 typedef struct {
   Atom wm_state;
@@ -77,9 +68,14 @@ typedef struct {
   Atom net_moveresize_window;
 } gf_atom_type;
 
+void gf_set_geometry(void *window_ptr, int x, int y, int width, int height,
+                     void *user_data, char *session);
+
+void gf_split_window_generic(void **windows, int window_count, int x, int y,
+                             int width, int height, int depth,
+                             gf_split_ctx *ctx);
+
 extern gf_atom_type atoms;
 void gf_init_atom(Display *display);
 
-#endif // __linux__
-
-#endif // GF_ARRANGE_H
+#endif // GF_EWMH

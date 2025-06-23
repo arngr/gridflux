@@ -75,6 +75,9 @@ static unsigned char *wm_x_get_window_property(Display *display, Window window,
     *status_out = status;
 
   if (status != Success || !data || *nitems == 0) {
+    LOG(GF_ERR, "Failed to fetch property (status=%d, nitems=%lu)", status,
+        *nitems);
+
     if (data)
       XFree(data);
     return NULL;
@@ -288,12 +291,13 @@ static Bool wm_x_window_in_workspace(Display *display, Window window,
   if (atoms.net_wm_desktop == None)
     return False;
 
-  unsigned long nitems;
+  unsigned long nitems = 0;
   int status;
+
   unsigned char *data = wm_x_get_window_property(
       display, window, atoms.net_wm_desktop, XA_CARDINAL, &nitems, &status);
 
-  if (!data)
+  if (!data || status != Success || nitems < 1)
     return False;
 
   unsigned long window_workspace_id = *(unsigned long *)data;
@@ -304,6 +308,9 @@ static Bool wm_x_window_in_workspace(Display *display, Window window,
 
 static Window *wm_x_filter_windows(Display *display, Window *windows,
                                    unsigned long *nitems, int workspace_id) {
+  if (!windows || !nitems || *nitems == 0)
+    return NULL;
+
   Window *filtered = malloc(sizeof(Window) * (*nitems));
   if (!filtered) {
     LOG(GF_ERR, ERR_FAIL_ALLOCATE);
@@ -327,12 +334,16 @@ static Window *wm_x_filter_windows(Display *display, Window *windows,
 
 static Window *wm_x_get_window_property_list(Display *display, Window root,
                                              Atom atom, unsigned long *nitems) {
+  if (!display || !nitems)
+    return NULL;
+
   int status;
   unsigned char *data =
       wm_x_get_window_property(display, root, atom, XA_WINDOW, nitems, &status);
 
-  if (!data) {
-    LOG(GF_ERR, ERR_BAD_WINDOW);
+  if (status != Success || !data || *nitems == 0) {
+    if (data)
+      XFree(data);
     return NULL;
   }
 
@@ -342,6 +353,9 @@ static Window *wm_x_get_window_property_list(Display *display, Window root,
 static Window *wm_x_fetch_window_list(Display *display, Window root,
                                       unsigned long *nitems, Atom atom,
                                       int workspace_id) {
+  if (!display || !nitems)
+    return NULL;
+
   Window *windows = wm_x_get_window_property_list(display, root, atom, nitems);
   if (!windows || *nitems == 0)
     return NULL;
@@ -349,6 +363,7 @@ static Window *wm_x_fetch_window_list(Display *display, Window root,
   Window *filtered =
       wm_x_filter_windows(display, windows, nitems, workspace_id);
   XFree(windows);
+
   return filtered;
 }
 
@@ -423,8 +438,10 @@ static int wm_x_get_total_window(Display *display, Window root) {
 
   for (int i = 0; i <= total_workspaces; i++) {
     unsigned long current_window_count = 0;
-    wm_x_fetch_window_list(display, root, &current_window_count,
-                           atoms.client_list, i);
+    Window *winlist = wm_x_fetch_window_list(
+        display, root, &current_window_count, atoms.client_list, i);
+    if (!winlist)
+      continue;
   }
 
   return total_win;

@@ -51,19 +51,19 @@
       const char *level_str = "UNKNOWN";                                       \
                                                                                \
       switch (level) {                                                         \
-      case GF_ERR:                                                       \
+      case GF_ERR:                                                             \
         color = RED;                                                           \
         level_str = "ERROR";                                                   \
         break;                                                                 \
-      case GF_WARN:                                                      \
+      case GF_WARN:                                                            \
         color = YELLOW;                                                        \
         level_str = "WARNING";                                                 \
         break;                                                                 \
-      case GF_INFO:                                                      \
+      case GF_INFO:                                                            \
         color = GREEN;                                                         \
         level_str = "INFO";                                                    \
         break;                                                                 \
-      case GF_DBG:                                                       \
+      case GF_DBG:                                                             \
         color = BLUE;                                                          \
         level_str = "DEBUG";                                                   \
         break;                                                                 \
@@ -89,19 +89,19 @@
       const char *level_str = "UNKNOWN";                                       \
                                                                                \
       switch (level) {                                                         \
-      case GF_ERR:                                                       \
+      case GF_ERR:                                                             \
         color = RED;                                                           \
         level_str = "ERROR";                                                   \
         break;                                                                 \
-      case GF_WARN:                                                      \
+      case GF_WARN:                                                            \
         color = YELLOW;                                                        \
         level_str = "WARNING";                                                 \
         break;                                                                 \
-      case GF_INFO:                                                      \
+      case GF_INFO:                                                            \
         color = GREEN;                                                         \
         level_str = "INFO";                                                    \
         break;                                                                 \
-      case GF_DBG:                                                       \
+      case GF_DBG:                                                             \
         color = BLUE;                                                          \
         level_str = "DEBUG";                                                   \
         break;                                                                 \
