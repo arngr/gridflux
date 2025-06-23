@@ -17,9 +17,8 @@
  * Copyright (C) 2024 Ardi Nugraha
  */
 
-#include "xsession.h"
-#include "arrange.h"
-#include "atoms.h"
+#include "xwm.h"
+#include "ewmh.h"
 #include "gridflux.h"
 #include <X11/Xlib.h>
 #include <stdarg.h>
@@ -30,7 +29,6 @@
 #include <strings.h>
 #include <sys/types.h>
 #include <sys/wait.h>
-#include <time.h>
 #include <unistd.h>
 
 const int MAX_WIN_OPEN = 8;
@@ -58,6 +56,31 @@ static int wm_x_error_handler(Display *display, XErrorEvent *error) {
     LOG(GF_ERR, ERR_BAD_WINDOW);
   }
   return 0; // Return 0 to prevent the program from terminating
+}
+
+static unsigned char *wm_x_get_window_property(Display *display, Window window,
+                                               Atom property, Atom type,
+                                               unsigned long *nitems,
+                                               int *status_out) {
+  Atom actual_type;
+  int actual_format;
+  unsigned long bytes_after;
+  unsigned char *data = NULL;
+
+  int status = XGetWindowProperty(display, window, property, 0, (~0L), False,
+                                  type, &actual_type, &actual_format, nitems,
+                                  &bytes_after, &data);
+
+  if (status_out)
+    *status_out = status;
+
+  if (status != Success || !data || *nitems == 0) {
+    if (data)
+      XFree(data);
+    return NULL;
+  }
+
+  return data;
 }
 
 static int wm_x_send_client_message(Display *display, Window window,
@@ -135,38 +158,55 @@ int wm_x_excluded_window(Display *display, Window window) {
 
   if (XGetWindowProperty(display, window, atoms.net_wm_state, 0, 1024, False,
                          XA_ATOM, &actual_type, &actual_format, &nitems,
-                         &bytes_after, &prop) == Success &&
-      prop != NULL) {
+                         &bytes_after, &prop) != Success ||
+      prop == NULL) {
+    return 0;
+  }
 
-    Atom *states = (Atom *)prop;
-    int result = 0;
+  Atom *states = (Atom *)prop;
+  int result = 0;
 
-    for (unsigned long i = 0; i < nitems; i++) {
-      if (states[i] == atoms.net_wm_hidden ||
-          states[i] == atoms.net_wm_notification ||
-          states[i] == atoms.net_wm_popup_menu ||
-          states[i] == atoms.net_wm_tooltip ||
-          states[i] == atoms.net_wm_toolbar ||
-          states[i] == atoms.net_wm_modal ||
-          states[i] == atoms.net_wm_skip_taskbar ||
-          states[i] == atoms.net_wm_utility) {
+  // Check for excluded window states
+  const Atom excluded_states[] = {
+      atoms.net_wm_hidden,       atoms.net_wm_notification,
+      atoms.net_wm_popup_menu,   atoms.net_wm_tooltip,
+      atoms.net_wm_toolbar,      atoms.net_wm_modal,
+      atoms.net_wm_skip_taskbar, atoms.net_wm_utility};
+
+  const size_t excluded_count =
+      sizeof(excluded_states) / sizeof(excluded_states[0]);
+
+  for (unsigned long i = 0; i < nitems && !result; i++) {
+    for (size_t j = 0; j < excluded_count; j++) {
+      if (states[i] == excluded_states[j]) {
         result = 1;
         break;
       }
     }
-
-    XFree(prop);
-    return result;
   }
 
-  return 0;
+  XFree(prop);
+  return result;
 }
 
 void wm_x_set_geometry(Display *display, Window window, int gravity,
                        unsigned long mask, int x, int y, int width,
                        int height) {
-  char *win_name = NULL;
-  XFetchName(display, window, &win_name);
+  XSizeHints hints;
+  long supplied_return;
+
+  if (gravity != 0) {
+    Status status =
+        XGetWMNormalHints(display, window, &hints, &supplied_return);
+    if (status == 0) {
+      memset(&hints, 0, sizeof(hints));
+      hints.flags = 0;
+    }
+
+    hints.flags |= PWinGravity;
+    hints.win_gravity = gravity;
+    XSetWMNormalHints(display, window, &hints);
+  }
 
   int pad = (mask & APPLY_PADDING) ? DEFAULT_PADDING : 0;
   x += pad;
@@ -174,36 +214,54 @@ void wm_x_set_geometry(Display *display, Window window, int gravity,
   width = width > pad * 2 ? width - pad * 2 : width;
   height = height > pad * 2 ? height - pad * 2 : height;
 
-  XEvent ev;
-  memset(&ev, 0, sizeof(ev));
-  ev.xclient.type = ClientMessage;
-  ev.xclient.message_type = atoms.net_moveresize_window;
-  ev.xclient.display = display;
-  ev.xclient.window = window;
-  ev.xclient.format = 32;
+  // Remove decorations using _MOTIF_WM_HINTS (optional)
+  if (mask & HINT_NO_DECORATIONS) {
+    struct {
+      unsigned long flags;
+      unsigned long functions;
+      unsigned long decorations;
+      long input_mode;
+      unsigned long status;
+    } hints = {2, 0, 0, 0, 0}; // decorations = 0 → no border/titlebar
 
-  // Flags: gravity + X + Y + Width + Height
-  ev.xclient.data.l[0] =
-      (gravity << 12) | (1 | 2 | 4 | 8); // bits for x/y/width/height
-  ev.xclient.data.l[1] = x;
-  ev.xclient.data.l[2] = y;
-  ev.xclient.data.l[3] = width;
-  ev.xclient.data.l[4] = height;
+    XChangeProperty(display, window, atoms.motif_wm_hints, atoms.motif_wm_hints,
+                    32, PropModeReplace, (unsigned char *)&hints, 5);
+  }
 
-  Window root = DefaultRootWindow(display);
-  Status result =
-      XSendEvent(display, root, False,
-                 SubstructureRedirectMask | SubstructureNotifyMask, &ev);
+  XWindowChanges changes;
+  unsigned int value_mask = 0;
 
+  if ((mask & (CHANGE_X | CHANGE_Y | CHANGE_WIDTH | CHANGE_HEIGHT)) !=
+      (CHANGE_X | CHANGE_Y | CHANGE_WIDTH | CHANGE_HEIGHT)) {
+    Window root;
+    int cur_x, cur_y;
+    unsigned int cur_width, cur_height, border, depth;
+
+    XGetGeometry(display, window, &root, &cur_x, &cur_y, &cur_width,
+                 &cur_height, &border, &depth);
+
+    changes.x = (mask & CHANGE_X) ? x : cur_x;
+    changes.y = (mask & CHANGE_Y) ? y : cur_y;
+    changes.width = (mask & CHANGE_WIDTH) ? width : cur_width;
+    changes.height = (mask & CHANGE_HEIGHT) ? height : cur_height;
+  } else {
+    changes.x = x;
+    changes.y = y;
+    changes.width = width;
+    changes.height = height;
+  }
+
+  if (mask & CHANGE_X)
+    value_mask |= CWX;
+  if (mask & CHANGE_Y)
+    value_mask |= CWY;
+  if (mask & CHANGE_WIDTH)
+    value_mask |= CWWidth;
+  if (mask & CHANGE_HEIGHT)
+    value_mask |= CWHeight;
+
+  XConfigureWindow(display, window, value_mask, &changes);
   XFlush(display);
-
-  LOG(GF_INFO,
-      "Set geometry via _NET_MOVERESIZE_WINDOW for 0x%lx \"%s\": "
-      "x=%d y=%d w=%d h=%d [result=%d]",
-      window, win_name ? win_name : "(unnamed)", x, y, width, height, result);
-
-  if (win_name)
-    XFree(win_name);
 }
 
 static void wm_x_arrange_window(int window_count, Window windows[],
@@ -225,74 +283,73 @@ static void wm_x_arrange_window(int window_count, Window windows[],
                           0, &ctx);
 }
 
-static Window *wm_x_fetch_window_list(Display *display, Window root,
-                                      unsigned long *nitems, Atom atom,
-                                      int workspace_id) {
-  Atom actual_type;
-  int actual_format;
-  unsigned long bytes_after;
-  Window *windows = NULL;
+static Bool wm_x_window_in_workspace(Display *display, Window window,
+                                     int workspace_id) {
+  if (atoms.net_wm_desktop == None)
+    return False;
 
-  if (XGetWindowProperty(display, root, atom, 0, (~0L), False, XA_WINDOW,
-                         &actual_type, &actual_format, nitems, &bytes_after,
-                         (unsigned char **)&windows) != Success) {
+  unsigned long nitems;
+  int status;
+  unsigned char *data = wm_x_get_window_property(
+      display, window, atoms.net_wm_desktop, XA_CARDINAL, &nitems, &status);
+
+  if (!data)
+    return False;
+
+  unsigned long window_workspace_id = *(unsigned long *)data;
+  XFree(data);
+
+  return window_workspace_id == (unsigned long)workspace_id;
+}
+
+static Window *wm_x_filter_windows(Display *display, Window *windows,
+                                   unsigned long *nitems, int workspace_id) {
+  Window *filtered = malloc(sizeof(Window) * (*nitems));
+  if (!filtered) {
+    LOG(GF_ERR, ERR_FAIL_ALLOCATE);
+    return NULL;
+  }
+
+  unsigned long count = 0;
+  for (unsigned long i = 0; i < *nitems; ++i) {
+    Window window = windows[i];
+    if (wm_x_excluded_window(display, window))
+      continue;
+
+    if (wm_x_window_in_workspace(display, window, workspace_id)) {
+      filtered[count++] = window;
+    }
+  }
+
+  *nitems = count;
+  return filtered;
+}
+
+static Window *wm_x_get_window_property_list(Display *display, Window root,
+                                             Atom atom, unsigned long *nitems) {
+  int status;
+  unsigned char *data =
+      wm_x_get_window_property(display, root, atom, XA_WINDOW, nitems, &status);
+
+  if (!data) {
     LOG(GF_ERR, ERR_BAD_WINDOW);
     return NULL;
   }
 
-  if (*nitems == 0) {
-    LOG(GF_INFO, ERR_BAD_WINDOW);
-    if (windows != NULL) {
-      XFree(windows);
-    }
+  return (Window *)data;
+}
+
+static Window *wm_x_fetch_window_list(Display *display, Window root,
+                                      unsigned long *nitems, Atom atom,
+                                      int workspace_id) {
+  Window *windows = wm_x_get_window_property_list(display, root, atom, nitems);
+  if (!windows || *nitems == 0)
     return NULL;
-  }
 
-  Window *filtered_windows = malloc(sizeof(Window) * (*nitems));
-  if (filtered_windows == NULL) {
-    LOG(GF_ERR, ERR_FAIL_ALLOCATE);
-    XFree(windows);
-    return NULL;
-  }
-
-  unsigned long filtered_count = 0;
-
-  for (unsigned long i = 0; i < *nitems; i++) {
-    Window window = windows[i];
-
-    if (wm_x_excluded_window(display, window))
-      continue;
-
-    if (atoms.net_wm_desktop == None) {
-      XFree(filtered_windows);
-      XFree(windows);
-      return NULL;
-    }
-
-    Atom actual_type;
-    int actual_format;
-    unsigned long nitems_returned, bytes_after;
-    unsigned char *data = NULL;
-    if (XGetWindowProperty(display, window, atoms.net_wm_desktop, 0, 1, False,
-                           XA_CARDINAL, &actual_type, &actual_format,
-                           &nitems_returned, &bytes_after, &data) == Success &&
-        data) {
-      unsigned long window_workspace_id = *(unsigned long *)data;
-      XFree(data);
-
-      if (window_workspace_id == workspace_id) {
-        filtered_windows[filtered_count++] = window;
-      }
-    }
-  }
-
-  *nitems = filtered_count;
-
-  if (windows != NULL) {
-    XFree(windows);
-  }
-
-  return filtered_windows;
+  Window *filtered =
+      wm_x_filter_windows(display, windows, nitems, workspace_id);
+  XFree(windows);
+  return filtered;
 }
 
 static unsigned long int wm_x_get_current_workspace(Display *display,

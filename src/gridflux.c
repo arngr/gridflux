@@ -18,7 +18,7 @@
  */
 
 #include "gridflux.h"
-#include "xsession.h"
+#include "xwm.h"
 #include <stdlib.h>
 #include <string.h>
 
